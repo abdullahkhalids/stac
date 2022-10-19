@@ -1,5 +1,32 @@
 import numpy as np
 from itertools import combinations
+from IPython.display import display, Math
+
+
+def print_matrix(array, augmented=False):
+    '''
+    Display an array using latex.
+    If augmented=True, then a line is placed
+    in the center of the matrix, which is useful
+    for printing the stabilizer generator matrix.
+    '''
+    data = ''
+    for line in array:
+        for element in line:
+            data += str(element) + ' & '
+        data = data[:-3]
+        data += r' \\' + '\n'
+
+    if augmented:
+        matname = '{array}'
+        (nrows, ncols) = array.shape
+        n = int(ncols/2)
+        c = ''.join(['c' for i in range(n)])
+        colalign = '{' + c + '|' + c + '}'
+        display(Math(f'\\left(\\begin{matname}{colalign}\n {data}\\end{matname}\\right)'))
+    else:
+        matname = '{pmatrix}'
+        display(Math(f'\\begin{matname}\n {data}\\end{matname}'))
 
 
 def _rref(A, colswap=True):
@@ -13,10 +40,10 @@ def _rref(A, colswap=True):
     (nrow, ncol) = M.shape
 
     if nrow == 0 or ncol == 0:
-        return M, 0, [] 
+        return M, 0, []
 
     ops = []
-    cur_col = 0 
+    cur_col = 0
 
     # iterate over each row and find pivot
     for cur_row in range(nrow):
@@ -54,7 +81,6 @@ def _rref(A, colswap=True):
                 ops.append(["addrow", r, cur_row])
 
         cur_col += 1
-
 
         # if we are are done with all cols
         if cur_col == ncol:
@@ -100,18 +126,18 @@ def print_pauli(G):
     for i in range(m):
         pauli_str = ''
         for j in range(n):
-            if G[i,j] == 0 and G[i,n+j] == 0:
+            if G[i, j] == 0 and G[i, n+j] == 0:
                 pauli_str += 'I'
-            elif G[i,j] and G[i,n+j]:
+            elif G[i, j] and G[i, n+j]:
                 pauli_str += 'Y'
-            elif G[i,j]:
+            elif G[i, j]:
                 pauli_str += 'X'
-            elif G[i,n+j]:
+            elif G[i, n+j]:
                 pauli_str += 'Z'
         print(pauli_str)
 
 
-def circuit_to_qasm(circuit, user_gates=''):
+def circuit_to_qasm(circuit, custom_gates=''):
     qasm_str = ''
 
     qubits = 0
@@ -126,7 +152,7 @@ def circuit_to_qasm(circuit, user_gates=''):
             continue
         elif op[0].upper() == 'R':
             op_str = 'reset q[{}];\n'.format(op[1])
-        elif op[0].upper() == 'MR':
+        elif op[0].upper() == 'MR' or op[0].upper() == 'M':
             op_str = 'measure q[{}] -> c[{}];\n'.format(op[1], op[1])
         elif op[0].upper() == 'TICK':
             op_str = 'barrier '
@@ -134,7 +160,7 @@ def circuit_to_qasm(circuit, user_gates=''):
                 op_str += 'q[{}],'.format(q)
             op_str = op_str[:-1] + ';\n'
         else:
-            op_str = op[0] + ' '
+            op_str = op[0].lower() + ' '
             # followed by one or two arguments
             if len(op) == 2:
                 op_str += 'q[{}];\n'.format(op[1])
@@ -147,7 +173,7 @@ def circuit_to_qasm(circuit, user_gates=''):
 
     qubits += 1
     qasm_str = 'OPENQASM 2.0;\ninclude "qelib1.inc";\n' + \
-        user_gates + \
+        custom_gates + \
         '\nqreg q[{}];\ncreg c[{}];\n'.format(qubits, qubits) + \
         qasm_str
 
@@ -208,6 +234,94 @@ def circuit_to_quirk(circuit):
     print(url)
 
 
+def draw_circuit(circuit, custom_gates=None, **kwargs):
+    from qiskit import QuantumCircuit
+    from IPython.display import display
+    if custom_gates is None:
+        display(QuantumCircuit.from_qasm_str(
+            circuit_to_qasm(circuit)).draw(**kwargs))
+    else:
+        display(QuantumCircuit.from_qasm_str(
+            circuit_to_qasm(circuit, custom_gates)).draw(**kwargs))
+
+
+def simulate_circuit(circuit,
+                     n,
+                     head=None,
+                     incremental=False,
+                     return_state=False,
+                     print_state=True):
+
+    from qiskit import QuantumCircuit, execute, Aer
+
+    if head is None:
+        head = ['basis', 'amplitude']
+
+    tab = [[bin(i)[2:][-1::-1].ljust(n, '0')] for i in range(2**n)]
+
+    cur_circ = []
+
+    for ind in range(len(circuit)):
+        op = circuit[ind]
+        if (op[0].upper() == 'TICK' and incremental) or ind == len(circuit)-1:
+            cur_circ.append(op)
+            cur_circ.append(["id", n-1])
+            qc = QuantumCircuit.from_qasm_str(circuit_to_qasm(cur_circ))
+            job = execute(qc, Aer.get_backend('statevector_simulator'),
+                          shots=1,
+                          optimization_level=0)
+            sv = job.result().get_statevector()
+            amps = np.round(sv.data, 3)
+            for i in range(2**n):
+                tab[i].append(amps[i])
+
+        else:
+            cur_circ.append(op)
+
+    if print_tab:
+        display_states(head, tab)
+
+    if return_tab:
+        return tab
+
+
+def display_states(head, *vars):
+    import tabulate
+    tabulate.PRESERVE_WHITESPACE = True
+    import copy
+
+    if len(vars) == 0:
+        return
+    else:
+        comb_tab = copy.deepcopy(vars[0])
+        for i in range(len(vars[0])):
+            for v in vars[1:]:
+                comb_tab[i] += v[i][1:]
+
+    # now delete unneeded lines
+    smalltab = []
+    for i in range(len(comb_tab)):
+        t = comb_tab[i]
+        if any(t[1:]):
+            line = [t[0]]
+            for val in t[1:]:
+                real = val.real
+                imag = val.imag
+                if np.isclose(real, 0) and np.isclose(imag, 0):
+                    line += [' ']
+                elif np.isclose(imag, 0):
+                    line += [f' {real:.3f}']
+                elif np.isclose(real, 0):
+                    line += [f'{imag:.3f}j']
+                elif real > 0:
+                    line += [f' {val:.3f}']
+                else:
+                    line += [f'{val:.3f}']
+            smalltab.append(line)
+
+    print(tabulate.tabulate(smalltab, headers=head, colalign=None))
+
+
 class Code:
 
     def __init__(self, gens_x, gens_z):
@@ -241,24 +355,26 @@ class Code:
 
         self.generators_qasm = None
 
-
     # def __repr__(self):
     #     pass
     #     # return 'Code({},{})'.format(self.gens_x, self_gens_z)
 
     def __str__(self):
-        return 'A [[{},{}]] code'.format(self.num_physical_qubits, self.num_logical_qubits)
-    
+        return 'A [[{},{}]] code'.format(self.num_physical_qubits,
+                                         self.num_logical_qubits)
+
     def check_valid_code(self):
         is_valid = True
         for i in range(self.num_generators-1):
             for j in range(i+1, self.num_generators):
-                if (self.gens_x[i]@self.gens_z[j] + self.gens_x[j]@self.gens_z[i])%2:
-                    print("Generators {} and {} don't commute".format(i,j))
+                if (self.gens_x[i]@self.gens_z[j] +
+                    self.gens_x[j]@self.gens_z[i]) % 2:
+
+                    print("Generators {} and {} don't commute".format(i, j))
                     print(np.append(self.gens_x[i], self.gens_z[i]))
                     print(np.append(self.gens_x[j], self.gens_z[j]))
                     is_valid = False
-                    
+
         return is_valid
 
     def standard_form(self):
@@ -277,17 +393,18 @@ class Code:
         (rEp, rankEp, opsEp) = _rref(standard_gens_z[self.rankx:, self.rankx:])
 
         # perform same operations on full matrices
-        self.standard_gens_x = _perform_row_operations(standard_gens_x, opsEp, self.rankx)
-        self.standard_gens_z = _perform_row_operations(standard_gens_z, opsEp, self.rankx)
+        self.standard_gens_x = _perform_row_operations(standard_gens_x,
+                                                       opsEp,
+                                                       self.rankx)
+        self.standard_gens_z = _perform_row_operations(standard_gens_z,
+                                                       opsEp,
+                                                       self.rankx)
 
         self.standard_gens_mat = np.concatenate((self.standard_gens_x,
                                                  self.standard_gens_z),
-                                                axis = 1)
+                                                axis=1)
 
         return self.standard_gens_x, self.standard_gens_z, self.rankx
-
-
-
 
     def construct_logical_operators(self):
         '''Construct a set of logical operators for the code,
@@ -300,7 +417,7 @@ class Code:
         k = self.num_logical_qubits
         r = self.rankx
 
-        # The relevant parts of the reduced generator matrix are 
+        # The relevant parts of the reduced generator matrix are
         A2 = self.standard_gens_x[0:r, (n-k):n]
         C1 = self.standard_gens_z[0:r, r:(n-k)]
         C2 = self.standard_gens_z[0:r, (n-k):n]
@@ -308,10 +425,10 @@ class Code:
 
         # Construct the logical X operators
         self.logical_xs = np.concatenate((
-            np.zeros((k,r), dtype=int),
+            np.zeros((k, r), dtype=int),
             E.transpose(),
             np.identity(k, dtype=int),
-            (E.transpose()@C1.transpose() + C2.transpose())%2,
+            (E.transpose()@C1.transpose() + C2.transpose()) % 2,
             np.zeros((k, n-r), dtype=int)
         ), axis=1)
 
@@ -373,7 +490,7 @@ class Code:
         self.destab_gen_mat = np.array(destabs)
         return self.destab_gen_mat
 
-    def construct_encoding_circuit(self, fixed=True):
+    def construct_encoding_circuit(self, fixed=False):
         '''Construct an encoding circuit for the code
         using Gottesman's method'''
 
@@ -391,37 +508,32 @@ class Code:
         for i in range(k):
             for j in range(r, n-k):
                 if self.logical_xs[i, j]:
-                    self.encoding_circuit.append(["cx", n-k+i, j])
+                    self.encoding_circuit.append(["CX", n-k+i, j])
 
         for i in range(r):
-            self.encoding_circuit.append(["h", i])
+            self.encoding_circuit.append(["H", i])
             for j in range(n):
                 if i == j:
                     continue
-                if self.standard_gens_x[i,j] and self.standard_gens_z[i,j]:
-                    self.encoding_circuit.append(["cx", i, j])
-                    self.encoding_circuit.append(["cz", i, j])
-                elif self.standard_gens_x[i,j]:
-                    self.encoding_circuit.append(["cx", i, j])
-                elif self.standard_gens_z[i,j]:
-                    self.encoding_circuit.append(["cz", i, j])
+                if self.standard_gens_x[i, j] and self.standard_gens_z[i, j]:
+                    self.encoding_circuit.append(["CX", i, j])
+                    self.encoding_circuit.append(["CZ", i, j])
+                elif self.standard_gens_x[i, j]:
+                    self.encoding_circuit.append(["CX", i, j])
+                elif self.standard_gens_z[i, j]:
+                    self.encoding_circuit.append(["CZ", i, j])
 
         if fixed:
             for i in range(3):
                 for j in range(n):
-                    if self.destab_gen_mat[i,j] and self.destab_gen_mat[i,n+j]:
-                        self.encoding_circuit.append(["x", j])
-                    elif self.destab_gen_mat[i,j]:
-                        self.encoding_circuit.append(["x", j])
-                    elif self.destab_gen_mat[i,n+j]:
-                        self.encoding_circuit.append(["z", j])
+                    if self.destab_gen_mat[i, j] and self.destab_gen_mat[i, n+j]:
+                        self.encoding_circuit.append(["X", j])
+                    elif self.destab_gen_mat[i, j]:
+                        self.encoding_circuit.append(["X", j])
+                    elif self.destab_gen_mat[i, n+j]:
+                        self.encoding_circuit.append(["Z", j])
 
         return self.encoding_circuit
-
-
-
-
-
 
     def construct_decoding_circuit(self):
         '''Construct a decoding circuit for the code
@@ -434,46 +546,77 @@ class Code:
 
         self.decoding_circuit = []
 
-
+        # Note, we will need num_logical_qubits ancilla
         for i in range(len(self.logical_zs)):
             for j in range(n):
-                if self.logical_zs[i,n+j]:
+                if self.logical_zs[i, n+j]:
                     self.decoding_circuit.append(["CX", j, n+i])
 
         for i in range(len(self.logical_xs)):
             for j in range(n):
-                if self.logical_xs[i,j] and self.logical_xs[i,n+j]:
-                    self.decoding_circuit.append(["CY", n+i, j])
-                elif self.logical_xs[i,j]:
+                if self.logical_xs[i, j] and self.logical_xs[i, n+j]:
+                    self.decoding_circuit.append(["CZ", n+i, j])
                     self.decoding_circuit.append(["CX", n+i, j])
-                elif self.logical_xs[i,n+j]:
+                elif self.logical_xs[i, j]:
+                    self.decoding_circuit.append(["CX", n+i, j])
+                elif self.logical_xs[i, n+j]:
                     self.decoding_circuit.append(["CZ", n+i, j])
 
         return self.decoding_circuit
 
-    def construct_syndrome_circuit(self):
+    def construct_syndrome_circuit(self, *args):
+        if len(args) == 0:
+            self.syndrome_circuit = self._construct_syndrome_circuit_simple(self.gens_x, self.gens_z)
+        elif type(args[0]) is str:
+            if args[0] == 'non_ft':
+                self.syndrome_circuit = self._construct_syndrome_circuit_simple(self.gens_x, self.gens_z)
+            elif args[0] == 'non_ft_standard':
+                if self.standard_gens_x is None:
+                    self.standard_form()
+                self.syndrome_circuit = self._construct_syndrome_circuit_simple(self.standard_gens_x, self.standard_gens_z)
+
+        return self.syndrome_circuit
+
+    def _construct_syndrome_circuit_simple(self, gens_x, gens_z):
         n = self.num_physical_qubits
         # ancilla are from n n+m-1
         self.syndrome_circuit = []
         for i in range(self.num_generators):
             # first apply hadamard to ancilla
-            self.syndrome_circuit.append(["h", n+i])
+            self.syndrome_circuit.append(["H", n+i])
 
+        self.syndrome_circuit.append(
+            ["TICK"] +
+            [i for i in range(self.num_physical_qubits,
+                              self.num_physical_qubits +
+                              self.num_generators)])
+
+        for i in range(self.num_generators):
             for j in range(self.num_physical_qubits):
-                if self.standard_gens_x[i, j] and self.standard_gens_z[i, j]:
-                    self.syndrome_circuit.append(["cx", n+i, j])
-                    self.syndrome_circuit.append(["cz", n+i, j])
-                elif self.standard_gens_x[i, j]:
-                    self.syndrome_circuit.append(["cx", n+i, j])
-                elif self.standard_gens_z[i, j]:
-                    self.syndrome_circuit.append(["cz", n+i, j])
+                if gens_x[i, j] and gens_z[i, j]:
+                    self.syndrome_circuit.append(["CX", n+i, j])
+                    self.syndrome_circuit.append(["CZ", n+i, j])
+                elif gens_x[i, j]:
+                    self.syndrome_circuit.append(["CX", n+i, j])
+                elif gens_z[i, j]:
+                    self.syndrome_circuit.append(["CZ", n+i, j])
 
+            self.syndrome_circuit.append(
+                ["TICK"] +
+                [i for i in range(self.num_physical_qubits,
+                                  self.num_physical_qubits +
+                                  self.num_generators)])
+
+        for i in range(self.num_generators):
             # last apply hadamard to ancilla
-            self.syndrome_circuit.append(["h", n+i])
+            self.syndrome_circuit.append(["H", n+i])
+
+        for i in range(self.num_generators):
+            self.syndrome_circuit.append(['MR', self.num_physical_qubits+i])
 
         return self.syndrome_circuit
 
-#    def _construct_syndrome_circuit_
+
 
     def generators_to_qasm(self):
 
