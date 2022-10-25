@@ -21,5 +21,5 @@ of useful functions. You can
 Stac is currently under active development and subject to rapid change.
 
 ## Getting started
-Please refer to my (recent blog posts)[https://abdullahkhalid.com/blog/] which
+Please refer to my [recent blog posts](https://abdullahkhalid.com/blog/) which
 illustrate its usage. 
