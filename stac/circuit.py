@@ -3,6 +3,7 @@ from IPython.display import display
 import json
 import numpy as np
 from qiskit import QuantumCircuit, execute, Aer
+import stim
 import copy
 import tabulate
 tabulate.PRESERVE_WHITESPACE = True
@@ -25,6 +26,54 @@ _circuit_operations = set.union(
     )
 
 
+def display_states(head, *vars):
+    """
+    Display states as a pretty table.
+
+    Parameters
+    ----------
+    head : List
+        A list of headings for the table.
+    *vars : List[List]
+        A list of states.
+
+    Returns
+    -------
+    None.
+
+    """
+    if len(vars) == 0:
+        return
+    else:
+        comb_tab = copy.deepcopy(vars[0])
+        for i in range(len(vars[0])):
+            for v in vars[1:]:
+                comb_tab[i] += v[i][1:]
+
+    # now delete unneeded lines
+    smalltab = []
+    for i in range(len(comb_tab)):
+        t = comb_tab[i]
+        if any(t[1:]):
+            line = [t[0]]
+            for val in t[1:]:
+                real = val.real
+                imag = val.imag
+                if np.isclose(real, 0) and np.isclose(imag, 0):
+                    line += [' ']
+                elif np.isclose(imag, 0):
+                    line += [f' {real:.3f}']
+                elif np.isclose(real, 0):
+                    line += [f'{imag:.3f}j']
+                elif real > 0:
+                    line += [f' {val:.3f}']
+                else:
+                    line += [f'{val:.3f}']
+            smalltab.append(line)
+
+    print(tabulate.tabulate(smalltab, headers=head, colalign=None))
+
+
 class Circuit:
     """Class for creating and manipulating quantum circuits."""
 
@@ -38,7 +87,7 @@ class Circuit:
 
     def __str__(self):
         """Class description."""
-        return 'A quantum circuit'
+        return self.__repr__()
 
     def __repr__(self):
         """Circuit description."""
@@ -48,6 +97,14 @@ class Circuit:
                 str_circ += f'{item} '
             str_circ += '\n'
         return str_circ
+
+    def __iter__(self):
+        """Return iterator for the quantum circuit."""
+        return self.circuit.__iter__()
+
+    def __len__(self):
+        """Return number of operations in circuit."""
+        return self.circuit.__len__()
 
     def append(self, *args):
         """
@@ -114,15 +171,50 @@ class Circuit:
 
         """
         new_circuit = Circuit()
-        for op in self.circuit:
-            new_circuit.append(op[1:])
-        for op in circuit2.circuit:
-            new_circuit.append(op[1:])
+        new_circuit.circuit += self.circuit
+        new_circuit.circuit += circuit2.circuit
+
+        new_circuit.num_qubits = max(self.num_qubits, circuit2.num_qubits)
 
         new_circuit.custom_gates = (self.custom_gates
                                     + '\n'
                                     + circuit2.custom_gates)
         return new_circuit
+
+    def __getitem__(self, ind):
+        """Make circuit subscriptable."""
+        return self.circuit.__getitem__(ind)
+
+    def compose(self, circuit2, start_ind=0):
+        """
+        Compose circuit2 to this circuit with first qubit at index start_ind.
+
+        Parameters
+        ----------
+        circuit2 : Circuit
+            Circuit that will be composed with this circuit.
+        start_ind : int
+            Index of where the first qubit of circuit2 will be placed.
+
+        Returns
+        -------
+        None.
+
+        """
+        for op in circuit2:
+            shifted_op = copy.deepcopy(op)
+            shifted_op[2] += start_ind
+            if shifted_op[2] + 1 > self.num_qubits:
+                self.num_qubits = shifted_op[2] + 1
+            if len(op) == 4:
+                shifted_op[3] += start_ind
+                if shifted_op[3] + 1 > self.num_qubits:
+                    self.num_qubits = shifted_op[3] + 1
+            self.circuit.append(shifted_op)
+
+        self.custom_gates = (self.custom_gates
+                             + '\n'
+                             + circuit2.custom_gates)
 
     def _next_error(self, q_ind):
         self.custom_gates += f'gate e{Circuit.error_ind} a {{id a;}}\n'
@@ -229,6 +321,22 @@ class Circuit:
 
         self.circuit = error_circuit
 
+    def without_noise(self):
+        """
+        Return a version of the circuit with no errors.
+
+        Returns
+        -------
+        noiseless_circuit : Circuit
+            Circuit with no error operations.
+
+        """
+        noiseless_circuit = Circuit()
+        for op in self.circuit:
+            if op[0] != 'E':
+                noiseless_circuit.append(op[1:])
+        return noiseless_circuit
+
     def qasm(self):
         """
         Convert circuit to qasm string.
@@ -292,7 +400,7 @@ class Circuit:
 
         for op in self.circuit:
 
-            if op[0] == 'E' and op[1][1] == 'e':
+            if op[0] == 'E' and op[1][0] == 'e':
                 continue
 
             # op[1] is the gate name
@@ -418,54 +526,118 @@ class Circuit:
                 cur_circ.append(op)
 
         if print_state:
-            self.display_states(head, tab)
+            display_states(head, tab)
 
         if return_state:
             return tab
 
-    def display_states(self, head, *vars):
+    def sample(self,
+               return_sample=False,
+               print_sample=True):
         """
-        Display states as a pretty table.
+        Return a sample from the circuit using stim.
 
         Parameters
         ----------
-        head : List
-            A list of headings for the table.
-        *vars : List[List]
-            A list of states.
+        return_sample : bool, optional
+            If True, return the sample. The default is False.
+        print_sample : bool, optional
+            If True, print the sample. The default is True.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
+        """
+        stim_circ = stim.Circuit(self.stim())
+        print(stim_circ)
+        print("\n\n\n")
+        sample = stim_circ.compile_sampler().sample(1)[0]
+
+        if print_sample:
+            print(*(1*sample), sep="")
+
+        if return_sample:
+            return 1*sample
+
+    def simulate_errors(self, library, error_gate):
+        """
+        Show the effect of each error in an annotated circuit.
+
+        Given a circuit annotated with errors, for each error simulate the
+        circuit with the error replaced by the error_gate.
+
+        Parameters
+        ----------
+        library: str
+            'qiskit' or 'stim'
+        error_gate : str
+            Any single-qubit pauli accepted by Qiskit.
 
         Returns
         -------
         None.
 
         """
-        if len(vars) == 0:
-            return
-        else:
-            comb_tab = copy.deepcopy(vars[0])
-            for i in range(len(vars[0])):
-                for v in vars[1:]:
-                    comb_tab[i] += v[i][1:]
+        if library == 'qiskit':
+            self._simulate_errors_qiskit(error_gate)
+        elif library == 'stim':
+            self._simulate_errors_stim(error_gate)
 
-        # now delete unneeded lines
-        smalltab = []
-        for i in range(len(comb_tab)):
-            t = comb_tab[i]
-            if any(t[1:]):
-                line = [t[0]]
-                for val in t[1:]:
-                    real = val.real
-                    imag = val.imag
-                    if np.isclose(real, 0) and np.isclose(imag, 0):
-                        line += [' ']
-                    elif np.isclose(imag, 0):
-                        line += [f' {real:.3f}']
-                    elif np.isclose(real, 0):
-                        line += [f'{imag:.3f}j']
-                    elif real > 0:
-                        line += [f' {val:.3f}']
-                    else:
-                        line += [f'{val:.3f}']
-                smalltab.append(line)
+    def _simulate_errors_qiskit(self, error_gate):
+        """
+        Simulate an error circuit using qiskit.
 
-        print(tabulate.tabulate(smalltab, headers=head, colalign=None))
+        Parameters
+        ----------
+        error_gate : str
+            Any single-qubit pauli accepted by Qiskit.
+
+        Returns
+        -------
+        None.
+
+        """
+        state_tabs = []
+        # first simulate the no, error state
+        state_tabs.append(self.simulate(print_state=False, return_state=True))
+        head = ['basis', 'no error']
+        # then iterate through the circuit
+        for i in range(len(self)):
+            if self.circuit[i][0] != 'E':
+                continue
+            # if op is an error, then copy the circuit and simulate
+            circ_copy = Circuit()
+            circ_copy.circuit = self.circuit.copy()
+            circ_copy.num_qubits = self.num_qubits
+            circ_copy.custom_gates = self.custom_gates
+            circ_copy.circuit.insert(i+1,
+                                     ['Q', error_gate, self.circuit[i][-1]])
+            state_tabs.append(circ_copy.simulate(
+                print_state=False,
+                return_state=True))
+            head.append(self.circuit[i][1])
+
+        display_states(head, *state_tabs)
+
+    def _sample_error_stim(self, error_gate):
+        
+        tab = []
+        head = ['error', 'syndrome']
+        for i in range(len(self)):
+            if self.circuit[i][0] != 'E':
+                continue
+            # if op is an error, then copy the circuit and simulate
+            circ_copy = Circuit()
+            circ_copy.circuit = self.circuit.copy()
+            circ_copy.num_qubits = self.num_qubits
+            circ_copy.custom_gates = self.custom_gates
+            circ_copy.circuit.insert(i+1,
+                                     ['Q', error_gate, self.circuit[i][-1]])
+
+            tab.append([self.circuit[i][1],
+                       circ_copy.sample(print_sample=False,
+                                        return_sample=True)])
+
+        print(tabulate.tabulate(tab, headers=head, colalign=None))
