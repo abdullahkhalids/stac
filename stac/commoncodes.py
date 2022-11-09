@@ -1,5 +1,5 @@
 import numpy as np
-from .stac import Code
+from .code import Code
 
 class CommonCodes:
     def __init__(self):

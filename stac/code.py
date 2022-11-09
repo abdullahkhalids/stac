@@ -189,19 +189,33 @@ def _inner_product(v, w):
 class Code:
     """Class for creating stabilizer codes."""
 
-    def __init__(self, generators_x, generators_z):
+    def __init__(self, *args):
         """Construct a stabilizer code."""
-        if generators_x.shape != generators_z.shape:
-            print("The shape of the matrices don't match")
-            return
+        if len(args) == 1:
+            self.generator_matrix = args[0]
 
-        self.generators_x = generators_x
-        self.generators_z = generators_z
+            self.num_physical_qubits = int(self.generator_matrix.shape[1]/2)
 
-        self.generator_matrix = np.concatenate(
-            (self.generators_x, self.generators_z), axis=1)
+            self.generators_x = \
+                self.generator_matrix[:, :self.num_physical_qubits]
+            self.generators_z = \
+                self.generator_matrix[:, self.num_physical_qubits:]
 
-        self.num_generators, self.num_physical_qubits = generators_x.shape
+        elif len(args) == 2:
+            if args[0].shape != args[1].shape:
+                print("The shape of the matrices don't match")
+                return
+
+            self.generators_x = args[0]
+            self.generators_z = args[1]
+
+            self.generator_matrix = np.concatenate(
+                (self.generators_x, self.generators_z), axis=1)
+
+            self.num_physical_qubits = self.generators_x.shape[1]
+
+        self.num_generators = self.generators_x.shape[0]
+
         self.num_logical_qubits = self.num_physical_qubits \
             - self.num_generators
 
@@ -406,8 +420,8 @@ class Code:
         if self.logical_xs is None:
             self.construct_logical_operators()
 
-        if self.destab_gen_mat is None:
-            self.find_destabilizers()
+        # if self.destab_gen_mat is None:
+        #     self.find_destabilizers()
 
         n = self.num_physical_qubits
         k = self.num_logical_qubits
@@ -543,7 +557,7 @@ class Code:
         self.syndrome_circuit.append(
             "TICK",
             self.num_physical_qubits,
-            self.num_physical_qubits + self.num_generators)
+            self.num_physical_qubits + self.num_generators-1)
 
         for i in range(self.num_generators):
             for j in range(self.num_physical_qubits):
@@ -558,7 +572,7 @@ class Code:
             self.syndrome_circuit.append(
                 "TICK",
                 self.num_physical_qubits,
-                self.num_physical_qubits + self.num_generators)
+                self.num_physical_qubits + self.num_generators-1)
 
         for i in range(self.num_generators):
             # last apply hadamard to ancilla

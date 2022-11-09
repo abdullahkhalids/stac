@@ -8,8 +8,8 @@ it a generator matrix, it will generate a code. You can then,
 * generate a decoding circuit
 * generate syndrome measurment circuit
 
-All circuits are built using the provided Circuit class. Circuits are number
-of useful functions. You can
+All circuits are built using the provided Circuit class. Circuits have a
+number of useful functions. You can
 
 * draw the circuits.
 * annotate the circuit with errors. This is useful for reasoning about how

@@ -18,15 +18,15 @@ _quantum_operations = set.union(
     _single_qubit_gates,
     _multi_qubit_gates,
     _measurements,
-    )
+)
 
 _circuit_operations = set.union(
     _quantum_operations,
     _circuit_annotations
-    )
+)
 
 
-def display_states(head, *vars):
+def display_states(head, *args):
     """
     Display states as a pretty table.
 
@@ -34,7 +34,7 @@ def display_states(head, *vars):
     ----------
     head : List
         A list of headings for the table.
-    *vars : List[List]
+    *args : List[List]
         A list of states.
 
     Returns
@@ -42,12 +42,12 @@ def display_states(head, *vars):
     None.
 
     """
-    if len(vars) == 0:
+    if len(args) == 0:
         return
     else:
-        comb_tab = copy.deepcopy(vars[0])
-        for i in range(len(vars[0])):
-            for v in vars[1:]:
+        comb_tab = copy.deepcopy(args[0])
+        for i in range(len(args[0])):
+            for v in args[1:]:
                 comb_tab[i] += v[i][1:]
 
     # now delete unneeded lines
@@ -185,7 +185,7 @@ class Circuit:
         """Make circuit subscriptable."""
         return self.circuit.__getitem__(ind)
 
-    def compose(self, circuit2, start_ind=0):
+    def compose(self, circuit2, *args):
         """
         Compose circuit2 to this circuit with first qubit at index start_ind.
 
@@ -193,23 +193,39 @@ class Circuit:
         ----------
         circuit2 : Circuit
             Circuit that will be composed with this circuit.
-        start_ind : int
-            Index of where the first qubit of circuit2 will be placed.
+        *args : int or List
+            int: Index of where the first qubit of circuit2 will be placed.
+            List: Should have as many elements as circuit2.num_qubits. The ith
+            entry specifies where the ith qubit will go.
 
         Returns
         -------
         None.
 
         """
+        qubit_map = dict()
+        if type(args[0]) is int:
+            for i in range(circuit2.num_qubits):
+                qubit_map[i] = i + args[0]
+            if circuit2.num_qubits + args[0] + 1 > self.num_qubits:
+                self.num_qubits = circuit2.num_qubits + args[0] + 1
+
+        elif type(args[0]) is list:
+            if len(args[0]) != circuit2.num_qubits:
+                raise ValueError
+
+            for i in range(circuit2.num_qubits):
+                qubit_map[i] = args[0][i]
+                if args[0][i] + 1 > self.num_qubits:
+                    self.num_qubits = args[0][i] + 1
+        else:
+            raise ValueError
+
         for op in circuit2:
             shifted_op = copy.deepcopy(op)
-            shifted_op[2] += start_ind
-            if shifted_op[2] + 1 > self.num_qubits:
-                self.num_qubits = shifted_op[2] + 1
+            shifted_op[2] = qubit_map[shifted_op[2]]
             if len(op) == 4:
-                shifted_op[3] += start_ind
-                if shifted_op[3] + 1 > self.num_qubits:
-                    self.num_qubits = shifted_op[3] + 1
+                shifted_op[3] = qubit_map[shifted_op[3]]
             self.circuit.append(shifted_op)
 
         self.custom_gates = (self.custom_gates
@@ -465,13 +481,13 @@ class Circuit:
                 QuantumCircuit.from_qasm_str(
                     self.qasm()
                 ).draw(output='latex')
-                )
+            )
         else:
             display(
                 QuantumCircuit.from_qasm_str(
                     self.qasm()
                 ).draw(**kwargs)
-                )
+            )
 
     def simulate(self,
                  head=None,
@@ -622,7 +638,7 @@ class Circuit:
         display_states(head, *state_tabs)
 
     def _sample_error_stim(self, error_gate):
-        
+
         tab = []
         head = ['error', 'syndrome']
         for i in range(len(self)):
