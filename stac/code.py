@@ -637,28 +637,3 @@ class Code:
             self.syndrome_circuit.append('MR', n+bs[i])
 
         return self.syndrome_circuit
-
-    def generators_to_qasm(self):
-        """Generate to qasm. Deprecated function. Don't use."""
-        if self.standard_generators_x is None:
-            self.construct_standard_form()
-
-        n = self.num_physical_qubits
-        m = self.num_generators
-
-        self.generators_qasm = []
-        for i in range(m):
-            circuit = []
-            for j in range(n):
-                if (self.standard_generators_x[i, j]
-                        and self.standard_generators_z[i, j]):
-
-                    circuit.append(["y", j])
-                elif self.standard_generators_x[i, j]:
-                    circuit.append(["x", j])
-                elif self.standard_generators_z[i, j]:
-                    circuit.append(["z", j])
-
-            # self.generators_qasm.append(circuit_to_qasm(circuit))
-
-        return self.generators_qasm
