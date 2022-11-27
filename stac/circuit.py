@@ -548,6 +548,7 @@ class Circuit:
             return tab
 
     def sample(self,
+               samples=1,
                return_sample=False,
                print_sample=True):
         """
@@ -567,12 +568,10 @@ class Circuit:
 
         """
         stim_circ = stim.Circuit(self.stim())
-        print(stim_circ)
-        print("\n\n\n")
-        sample = stim_circ.compile_sampler().sample(1)[0]
+        sample = stim_circ.compile_sampler().sample(samples)
 
         if print_sample:
-            print(*(1*sample), sep="")
+            print(*(1*sample), sep="\n")
 
         if return_sample:
             return 1*sample
