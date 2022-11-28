@@ -184,6 +184,13 @@ class Circuit:
     def __getitem__(self, ind):
         """Make circuit subscriptable."""
         return self.circuit.__getitem__(ind)
+    
+    def reverse(self):
+        """Return a reversed copy of the circuit."""
+        rev_circ = Circuit()
+        for i in range(len(self.circuit)-1,-1,-1):
+            rev_circ.append(self.circuit[i][1:])
+        return rev_circ
 
     def compose(self, circuit2, *args):
         """
@@ -521,15 +528,15 @@ class Circuit:
 
         tab = [[bin(i)[2:][-1::-1].ljust(n, '0')] for i in range(2**n)]
 
-        cur_circ = []
+        cur_circ = Circuit()
 
         for ind in range(len(self.circuit)):
             op = self.circuit[ind]
-            if ((op[0].upper() == 'TICK' and incremental)
+            if ((op[1] == 'TICK' and incremental)
                     or ind == len(self.circuit)-1):
-                cur_circ.append(op)
-                cur_circ.append(["id", n-1])
-                qc = QuantumCircuit.from_qasm_str(self.qasm())
+                cur_circ.append(op[1:])
+                cur_circ.append("id", n-1)
+                qc = QuantumCircuit.from_qasm_str(cur_circ.qasm())
                 job = execute(qc, Aer.get_backend('statevector_simulator'),
                               shots=1,
                               optimization_level=0)
@@ -539,7 +546,7 @@ class Circuit:
                     tab[i].append(amps[i])
 
             else:
-                cur_circ.append(op)
+                cur_circ.append(op[1:])
 
         if print_state:
             display_states(head, tab)
