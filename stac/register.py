@@ -1,23 +1,170 @@
 """Provides a set of classes to define registers of qubits."""
-from .qubit import CircuitQubit
+from .qubit import VirtualQubit
 
 
 class Register:
-    """Class to create and manipulate registers."""
+    """
+    Class to create and manipulate registers.
+
+    Registers have a type that determines how the register is functionally
+    used within the fault-tolerant circuit. Stac recognizes the following
+    types:
+        d : Data registers store encoded qubits. For a [[n,k,d]] code, the
+            size of such registers should be n.
+        g : Stabilizer generator measurement registers have the ancilla qubits
+            used to measure one stabilizer generator of a code. The size of
+            such registers is usually equal to the weight of the generator.
+        s : Syndrome measurement registers are a collection of g-type
+            registers.
+        e : Encoded qubit registers usually contain one d-type register and
+            one s-type register.
+    However, these types are not enforced in any way, and the registers can be
+    given any type.
+    """
 
     def __init__(self):
 
-        # self.index = None
-        # functional type
+        self.index = None
         self.register_type = None
 
         self.elements = []
 
         self.level = None
 
+    def __repr__(self):
+        if type(self) is QubitRegister:
+            t = 'QubitRegister'
+        else:
+            t = 'RegisterRegister'
+        return ''.join([t,
+                        f'(register_type={self.register_type}, ',
+                        f'level={self.level}, ',
+                        f'len={self.__len__()})'])
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __len__(self):
+        return len(self.elements)
+
+    def __iter__(self):
+        return self.elements.__iter__()
+
+    def __getitem__(self, value):
+        """Make register subscriptable."""
+        if type(value) is int:
+            return self.elements.__getitem__(value)
+
+        s = 'self'
+        for i, index in enumerate(value):
+            if type(index) is int:
+                s += f'.elements[{index}]'
+                try:
+                    eval(s)
+                except IndexError:
+                    error_message = f'The register does not contain a \
+subregister or qubit at {value[:i+1]}'
+                    raise IndexError(error_message)
+        return eval(s)
+
+    def append(self, *registers):
+        # apply appropriate checks
+        if len(registers) == 1:
+            if (type(registers[0]) is RegisterRegister
+                    or type(registers[0]) is QubitRegister):
+                registers_list = [registers[0]]
+        else:
+            registers_list = registers
+
+        for register in registers_list:
+            register.index = len(self)
+            self.elements.append(register)
+
+    @property
+    def num_qubits(self):
+        if type(self) is QubitRegister:
+            return len(self.elements)
+        else:
+            return sum([register.num_qubits for register in self.elements])
+
+    def print_structure(self, depth=-1):
+        """
+        Print the register structure.
+
+        Parameters
+        ----------
+        max_depth : TYPE, optional
+            DESCRIPTION. The default is -1.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
+        """
+        if depth == -1:
+            depth = 4294967295
+
+        def determine_structure(register, indent, d):
+            if d > depth:
+                return ''
+            s = ' '*indent
+            s += ' '.join([str(register.index),
+                           register.register_type,
+                           'x',
+                           str(len(register)),
+                           '\n'])
+            if type(register) is not QubitRegister:
+                for child_register in register.elements:
+                    s += determine_structure(child_register, indent+3, d+1)
+            return s
+        print(determine_structure(self, 0, 0))
+
+    def check_address(self, address):
+        truncated_address = address[:-1]
+        try:
+            self[truncated_address]
+        except KeyError:
+            raise Exception('Address not found')
+
+        if type(self[truncated_address]) is not QubitRegister:
+            raise Exception('Not a qubit register')
+
+        try:
+            self[address]
+        except KeyError:
+            raise Exception('Address not found')
+
+        return True
+
+    def qubit_addresses(self, my_address=tuple()):
+        address_list = []
+
+        def determine_structure(register, my_address):
+            if type(register) is RegisterRegister:
+                for i, child_register in enumerate(register.elements):
+                    determine_structure(child_register, my_address + (i,))
+            else:
+                for i, qubit in enumerate(register.elements):
+                    address_list.append(my_address + (i,))
+        determine_structure(self, tuple())
+        return address_list
+
+    @property
+    def qubits(self):
+        def iterator(register):
+            if type(register) is RegisterRegister:
+                for child_register in register:
+                    yield from iterator(child_register)
+            else:
+                for qubit in register:
+                    yield qubit
+
+        return iterator(self)
+
 
 class QubitRegister(Register):
-    """Class to manipulate registers made out of circuit qubits."""
+    """Class to manipulate registers made out of virtual qubits."""
 
     def __init__(self,
                  register_type,
@@ -29,11 +176,11 @@ class QubitRegister(Register):
         self.level = level
         qubit_list = []
         for i in range(num_qubits):
-            q = CircuitQubit(self.level,
+            q = VirtualQubit(self.level,
                              i)
             qubit_list.append(q)
 
-        self.elements = tuple(qubit_list)
+        self.elements = qubit_list
 
         self.index = index
 
@@ -54,18 +201,22 @@ class RegisterRegister(Register):
     def __init__(self,
                  register_type,
                  level,
-                 *args):
+                 subregisters=None,
+                 code=None):
 
         self.register_type = register_type
         self.level = level
+        self.elements = []
 
-        if len(args) == 1 and type(args[0]) is list:
-            self.elements = tuple(args[0])
-        else:
-            self.elements = args
+        if type(subregisters) is list or type(subregisters) is tuple:
+            self.elements = list(subregisters)
+        elif (type(subregisters) is QubitRegister
+                or type(subregisters) is RegisterRegister):
+            self.elements = list([subregisters])
+        for i, register in enumerate(self.elements):
+            register.index = i
 
-        for i, reg in enumerate(self.elements):
-            reg.index = i
+        self.code = code
 
         self.index = None
 
@@ -76,3 +227,11 @@ class RegisterRegister(Register):
     @index.setter
     def index(self, value):
         self._index = value
+
+    def _create_encoded_qubit_register(self):
+        n = self.attached_code.num_physical_qubits
+        datareg = QubitRegister('d', self.level, n)
+        genregs = [QubitRegister('g', self.level, sum(g))
+                   for g in self.attached_code.generator_matrix]
+        syndreg = RegisterRegister('s', 0, genregs)
+        self.append(datareg, syndreg)

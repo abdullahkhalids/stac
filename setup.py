@@ -6,7 +6,7 @@ with open("README.md", "r") as f:
     long_description = f.read()
 
 setup(
-    name="stac",
+    name="stacdev",
     version="0.1",
     author="Abdullah Khalid",
     author_email="abdullah@abdullahkhalid.com",

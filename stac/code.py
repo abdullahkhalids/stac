@@ -3,7 +3,13 @@
 from itertools import combinations
 from IPython.display import display, Math
 import numpy as np
+
+# from .operation import Operation
+# from .timepoint import Timepoint
+# from .qubit import PhysicalQubit, VirtualQubit
+from .register import QubitRegister, RegisterRegister
 from .circuit import Circuit
+from .supportedoperations import _quantum_operations
 
 
 def print_matrix(array, augmented=False):
@@ -231,15 +237,17 @@ class Code:
 
         self.logical_xs = None
         self.logical_zs = None
+        self.logical_circuits = dict()
+        for op in _quantum_operations:
+            self.logical_circuits[op] = None
 
         self.encoding_circuit = None
         self.decoding_circuit = None
 
-        self.generators_qasm = None
-
-    # def __repr__(self):
-    #     pass
-    #     # return 'Code({},{})'.format(self.generators_x, self_generators_z)
+    def __repr__(self):
+        """Return way to make code."""
+        pass
+        return f'Code(\n{self.generator_matrix}\n)'
 
     def __str__(self):
         """Return description of code."""
@@ -310,6 +318,8 @@ class Code:
         """
         Construct logical operators for the code.
 
+        Uses Gottesman's method for doing this.
+
         Returns
         -------
         logical_xs
@@ -348,6 +358,64 @@ class Code:
         ), axis=1, dtype=int)
 
         return self.logical_xs, self.logical_zs
+
+    def construct_logical_gate_circuits(self):
+        """
+        Create the circuits that implement logical circuits for the code.
+
+        Results are storted in logical_circuits.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.logical_xs is None:
+            self.construct_logical_operators()
+
+        n = self.num_physical_qubits
+
+        for name, operators in [('X', self.logical_xs),
+                                ('Z', self.logical_zs)]:
+            circ = Circuit()
+            circ.append_register(
+                self.construct_encoded_qubit_register(0, 'non_ft'))
+
+            for pauli in operators:
+                for i in range(n):
+                    if pauli[i] and pauli[n+i]:
+                        circ.append('Y', (0, 0, 0, i))
+                    elif pauli[i]:
+                        circ.append('X', (0, 0, 0, i))
+                    elif pauli[n+i]:
+                        circ.append('Z', (0, 0, 0, i))
+
+            self.logical_circuits[name] = circ
+
+        circ = Circuit()
+        circ.append_register(
+            self.construct_encoded_qubit_register(0, 'non_ft'))
+        for i in range(n):
+            circ.append('H', (0, 0, 0, i))
+        self.logical_circuits['H'] = circ
+        
+        circ = Circuit()
+        circ.append_register(
+            self.construct_encoded_qubit_register(0, 'non_ft'))
+        for i in range(self.num_generators):
+            circ.append('M', (0, 0, 1, i, 0))
+        self.logical_circuits['M'] = circ
+
+        for name in ['CX', 'CZ']:
+            circ = Circuit()
+            circ.append_register(
+                self.construct_encoded_qubit_register(0, 'non_ft'))
+            circ.append_register(
+                self.construct_encoded_qubit_register(0, 'non_ft'))
+            for i in range(n):
+                circ.append(name, (0, 0, 0, i), (0, 1, 0, i))
+
+            self.logical_circuits[name] = circ
 
     def find_destabilizers(self):
         """
@@ -402,14 +470,49 @@ class Code:
         self.destab_gen_mat = np.array(destabs)
         return self.destab_gen_mat
 
-    def construct_encoding_circuit(self, fixed=False):
+    def construct_encoded_qubit_register(self,
+                                         level,
+                                         syndrome_measurement_type):
         """
-        Construct an encoding circuit for the code using Gottesman's method.
+        Create a register appropriate for creating an encoded qubit.
 
         Parameters
         ----------
-        fixed : bool, optional
-            Don't use this. The default is False.
+        level : int
+            The concatenation level of the qubit.
+        syndrome_measurement_type : str
+            Options are 'non_ft',
+                        'non_ft_standard',
+                        'cat',
+                        'cat_standard'.
+            With the 'standard' postfix uses the standard form of the
+            generators. If no argument, then 'non_ft' is Default.
+
+        Returns
+        -------
+        RegisterRegister
+            Register for encoded qubit.
+
+        """
+        n = self.num_physical_qubits
+        datareg = QubitRegister('d', level, n)
+        if syndrome_measurement_type == 'non_ft':
+            genregs = [QubitRegister('g', level, 1)
+                       for i in range(self.num_generators)]
+        elif syndrome_measurement_type == 'cat':
+            genregs = [QubitRegister('g', level, sum(g))
+                       for g in self.generator_matrix]
+        else:
+            raise Exception("Unknown 'syndrome_measurement_type'")
+        syndreg = RegisterRegister('s', level, genregs)
+        return RegisterRegister('e',
+                                level,
+                                subregisters=(datareg, syndreg),
+                                code=self)
+
+    def construct_encoding_circuit(self):
+        """
+        Construct an encoding circuit for the code using Gottesman's method.
 
         Returns
         -------
@@ -420,44 +523,33 @@ class Code:
         if self.logical_xs is None:
             self.construct_logical_operators()
 
-        # if self.destab_gen_mat is None:
-        #     self.find_destabilizers()
-
         n = self.num_physical_qubits
         k = self.num_logical_qubits
         r = self.rankx
 
         self.encoding_circuit = Circuit()
+        rg = QubitRegister('d', 0, n)
+        self.encoding_circuit.append_register(rg)
+        self.encoding_circuit.base_address = (0, 0)
         for i in range(k):
             for j in range(r, n-k):
                 if self.logical_xs[i, j]:
-                    self.encoding_circuit.append(["CX", n-k+i, j])
+                    self.encoding_circuit.append("CX", n-k+i, j)
 
         for i in range(r):
-            self.encoding_circuit.append(["H", i])
+            self.encoding_circuit.append("H", i)
             for j in range(n):
                 if i == j:
                     continue
                 if (self.standard_generators_x[i, j]
                         and self.standard_generators_z[i, j]):
 
-                    self.encoding_circuit.append(["CX", i, j])
-                    self.encoding_circuit.append(["CZ", i, j])
+                    self.encoding_circuit.append("CX", i, j)
+                    self.encoding_circuit.append("CZ", i, j)
                 elif self.standard_generators_x[i, j]:
-                    self.encoding_circuit.append(["CX", i, j])
+                    self.encoding_circuit.append("CX", i, j)
                 elif self.standard_generators_z[i, j]:
-                    self.encoding_circuit.append(["CZ", i, j])
-
-        if fixed:
-            for i in range(3):
-                for j in range(n):
-                    if (self.destab_gen_mat[i, j]
-                            and self.destab_gen_mat[i, n+j]):
-                        self.encoding_circuit.append(["X", j])
-                    elif self.destab_gen_mat[i, j]:
-                        self.encoding_circuit.append(["X", j])
-                    elif self.destab_gen_mat[i, n+j]:
-                        self.encoding_circuit.append(["Z", j])
+                    self.encoding_circuit.append("CZ", i, j)
 
         return self.encoding_circuit
 
@@ -547,39 +639,51 @@ class Code:
 
     def _construct_syndrome_circuit_simple(self, generators_x, generators_z):
         """Construct a non-fault tolerant syndrome circuit."""
-        n = self.num_physical_qubits
-        # ancilla are from n n+m-1
         self.syndrome_circuit = Circuit()
+        rg = self.construct_encoded_qubit_register(0, 'non_ft')
+        self.syndrome_circuit.append_register(rg)
+
         for i in range(self.num_generators):
             # first apply hadamard to ancilla
-            self.syndrome_circuit.append(["H", n+i])
+            self.syndrome_circuit.append("H", (0, 0, 1, i, 0))
 
-        self.syndrome_circuit.append(
-            "TICK",
-            self.num_physical_qubits,
-            self.num_physical_qubits + self.num_generators-1)
+        # self.syndrome_circuit.append(
+        #     "TICK",
+        #     self.num_physical_qubits,
+        #     self.num_physical_qubits + self.num_generators-1)
 
         for i in range(self.num_generators):
             for j in range(self.num_physical_qubits):
                 if generators_x[i, j] and generators_z[i, j]:
-                    self.syndrome_circuit.append(["CX", n+i, j])
-                    self.syndrome_circuit.append(["CZ", n+i, j])
+                    self.syndrome_circuit.append("CX",
+                                                 (0, 0, 1, i, 0),
+                                                 (0, 0, 0, j))
+                    self.syndrome_circuit.append("CZ",
+                                                 (0, 0, 1, i, 0),
+                                                 (0, 0, 0, j))
                 elif generators_x[i, j]:
-                    self.syndrome_circuit.append(["CX", n+i, j])
+                    self.syndrome_circuit.append("CX",
+                                                 (0, 0, 1, i, 0),
+                                                 (0, 0, 0, j))
                 elif generators_z[i, j]:
-                    self.syndrome_circuit.append(["CZ", n+i, j])
+                    self.syndrome_circuit.append("CZ",
+                                                 (0, 0, 1, i, 0),
+                                                 (0, 0, 0, j))
 
-            self.syndrome_circuit.append(
-                "TICK",
-                self.num_physical_qubits,
-                self.num_physical_qubits + self.num_generators-1)
+            # self.syndrome_circuit.append(
+            #     "TICK",
+            #     self.num_physical_qubits,
+            #     self.num_physical_qubits + self.num_generators-1)
 
-        for i in range(self.num_generators):
+        self.syndrome_circuit.append("H", (0, 0, 1, 0, 0), insert=[1])
+        for i in range(1, self.num_generators):
             # last apply hadamard to ancilla
-            self.syndrome_circuit.append(["H", n+i])
+            self.syndrome_circuit.append("H", (0, 0, 1, i, 0))
 
-        for i in range(self.num_generators):
-            self.syndrome_circuit.append(['MR', self.num_physical_qubits+i])
+        self.syndrome_circuit.append('M', (0, 0, 1, 0, 0), insert=[1])
+        for i in range(1, self.num_generators):
+            # change to MR
+            self.syndrome_circuit.append('M', (0, 0, 1, i, 0))
 
         return self.syndrome_circuit
 

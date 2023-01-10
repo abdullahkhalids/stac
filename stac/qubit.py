@@ -4,14 +4,14 @@
 class PhysicalQubit:
     """Class to create and manipulate physical qubits."""
 
-    def __init__(self):
-        self.index = None
-        self.coordinates = None
-        self.interactable_qubits = None
+    def __init__(self, index, coordinates, interactable_qubits):
+        self.index = index
+        self.coordinates = coordinates
+        self.interactable_qubits = interactable_qubits
 
 
-class CircuitQubit:
-    """Class to create and manipulate circuit qubits."""
+class VirtualQubit:
+    """Class to create and manipulate virtual qubits."""
 
     def __init__(self,
                  level,
@@ -29,6 +29,8 @@ class CircuitQubit:
         # The register this qubit is made of
         self.constituent_register = constituent_register
         self.index_in_constituent_register = index_in_constituent_register
+
+        self.register_type='q'
 
     @property
     def index_in_assigned_register(self):
