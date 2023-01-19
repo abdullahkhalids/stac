@@ -22,21 +22,17 @@ number of useful functions. You can
 Stac is currently undergoing a complete overwrite to make it suitable for
 constructing fault-tolerant circuits. The goals and progress (18 Jan 2023)
 
-[x] There is an intrinsic notion of encoded qubits at any concatenation
-    level in the circuit. User can create registers of such qubits.
-
-[x] The `append` function can apply a logical operation to qubits at any level
-    of concatentation. The resultant operation is automatically compiled down
-    to the physical qubits.
-
-[ ] The user can construct a fault-tolerant circuit for any stabilizer 
-    code using a few lines of code. (Works for codes with k=1 currently)
-
-[ ] Provide the user with a rich assembly language to construct custom 
-    fault-tolerant circuits (basic functionality present but needs improvement)
-
-[ ] Export a stim circuit that can be used to compute the threshold of the 
-    code.
+* [x] There is an intrinsic notion of encoded qubits at any concatenation
+      level in the circuit. User can create registers of such qubits.
+* [x] The `append` function can apply a logical operation to qubits at any level
+      of concatentation. The resultant operation is automatically compiled down
+      to the physical qubits.
+* [ ] The user can construct a fault-tolerant circuit for any stabilizer 
+      code using a few lines of code. (Works for codes with k=1 currently)
+* [ ] Provide the user with a rich assembly language to construct custom 
+      fault-tolerant circuits (basic functionality present but needs improvement)
+* [ ] Export a stim circuit that can be used to compute the threshold of the 
+      code.
 
 Documentation will be made available once the developmental version is ready
 to be merged into `main`. 
