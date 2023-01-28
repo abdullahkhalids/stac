@@ -10,6 +10,11 @@ import textwrap
 
 
 # from IPython.display import display
+import sys
+from shutil import move
+import gc
+
+
 import json
 import numpy as np
 from qiskit import QuantumCircuit, execute, Aer
@@ -70,15 +75,20 @@ def display_states(head, *args):
 class Circuit:
     """Class for creating and manipulating quantum circuits."""
 
-    def __init__(self):
+    def __init__(self, *args):
         """Construct a quantum circuit."""
-        self._timepoints = []
+        self.timepoints = []
+        self._cur_time = 0
 
         self.register = RegisterRegister('circuit', -2)
         self.register.index = 0
 
         self.register.append(RegisterRegister('level0', -1))
-        self.register.print_structure = self._print_structure
+        self.register.structure = self._structure
+
+        if (len(args) > 0
+                and type(args[0]) in [RegisterRegister, QubitRegister]):
+            self.append_register(args[0])
 
         self.base_address = tuple()
 
@@ -110,9 +120,9 @@ class Circuit:
 
     def __repr__(self):
         """Class description."""
-        label_len = len(str(len(self._timepoints)-1))+1
+        label_len = len(str(len(self.timepoints)-1))+1
         s = ''
-        for i, tp in enumerate(self._timepoints):
+        for i, tp in enumerate(self.timepoints):
             st = textwrap.indent(str(tp), ' '*label_len)
             st = str(i).rjust(label_len-1) + st[label_len-1:] + '\n'
             s += st
@@ -125,18 +135,18 @@ class Circuit:
 
     def __iter__(self):
         """Return iterator for the quantum circuit."""
-        for tp in self._timepoints:
+        for tp in self.timepoints:
             for op in tp:
                 yield op
 
     def __getitem__(self, ind):
         """Make circuit subscriptable."""
         if ind >= 0:
-            iterator = self._timepoints
+            iterator = self.timepoints
             compare = int.__gt__
             inc = int.__add__
         else:
-            iterator = reversed(self._timepoints)
+            iterator = reversed(self.timepoints)
             compare = int.__le__
             inc = int.__sub__
 
@@ -152,7 +162,26 @@ class Circuit:
 
     def __len__(self):
         """Return number of operations in the quantum circuit."""
-        return sum([len(tp) for tp in self._timepoints])
+        return sum([len(tp) for tp in self.timepoints])
+
+    @property
+    def cur_time(self):
+        """
+        Return time at which new operations will begin getting added.
+
+        Returns
+        -------
+        int
+            Current time.
+
+        """
+        return self._cur_time
+
+    @cur_time.setter
+    def cur_time(self, new_time):
+        self._cur_time = new_time
+        while self._cur_time >= len(self.timepoints):
+            self._append_tp(Timepoint())
 
     def _standardize_addresses(self, addresses):
 
@@ -189,29 +218,34 @@ class Circuit:
         else:
             return standardized_addresses
 
-    def _apply_encoded_operation(self, op, insert=None):
+    def _apply_encoded_operation(self, op, time=None):
         crt = self.register[op.targets[0]].constituent_register
         target_register = self.register[crt]
         circ = target_register.code.logical_circuits[op.name]
+        if circ is None:
+            raise Exception(f'No logical circuit for {op.name}')
 
         if op.is_controlled:
             crc = self.register[op.controls[0]].constituent_register
-            # control_register = self.register[crc]
 
-        # if target_register.level == 0:
         if not op.is_controlled:
             for circ_op in circ:
-                self.append(op.name, crt+circ_op.targets[0][2:], insert=insert)
+                if not circ_op.is_controlled:
+                    self.append(circ_op.name,
+                                crt+circ_op.targets[0][2:],
+                                time=time)
+                else:
+                    self.append(circ_op.name,
+                                crt+circ_op.controls[0][2:],
+                                crt+circ_op.targets[0][2:],
+                                time=time)
         else:
             for circ_op in circ:
                 self.append(
                     op.name, crc+circ_op.controls[0][2:],
-                    crt+circ_op.targets[0][2:], insert=insert)
-        # else:
-        #     for circ_op in circ:
-        #         self._apply_encoded_operation(circ_op)
+                    crt+circ_op.targets[0][2:], time=time)
 
-    def append(self, *args, insert=None):
+    def append(self, *args, time=None):
         """
         Append a new operation to the circuit.
 
@@ -219,7 +253,7 @@ class Circuit:
         ----------
         *args : TYPE
             DESCRIPTION.
-        insert : TYPE, optional
+        time : TYPE, optional
             DESCRIPTION. The default is None.
 
         Raises
@@ -232,6 +266,7 @@ class Circuit:
         None.
 
         """
+        # construct the operation if needed
         if len(args) == 1 and type(args[0]) is Operation:
             op = args[0]
         elif type(args[0]) is str:
@@ -250,27 +285,40 @@ class Circuit:
         else:
             raise Exception('Not a valid operation')
 
+        # Insert the operation into the circuit
         if op.targets[0][0] == 0:
-            if insert is None:
-                if len(self._timepoints) == 0 \
-                        or not self._timepoints[-1].can_append(op):
-                    tp = Timepoint(op)
-                    self._timepoints.append(tp)
+            if time is None:
+                while self.cur_time < len(self.timepoints):
+                    if self.timepoints[self.cur_time].can_append(op):
+                        self.timepoints[self.cur_time].append(op)
+                        break
+                    else:
+                        self.cur_time += 1
                 else:
-                    self._timepoints[-1].append(op)
-            elif insert == [1]:
+                    tp = Timepoint(op)
+                    self.timepoints.append(tp)
+
+                # if len(self.timepoints) == 0 \
+                #         or not self.timepoints[-1].can_append(op):
+                #     tp = Timepoint(op)
+                #     self.timepoints.append(tp)
+                # else:
+                #     self.timepoints[-1].append(op)
+            elif time == [1]:
                 tp = Timepoint(op)
-                self._timepoints.append(tp)
-            elif type(insert) is int:
-                if not self._timepoints[insert].can_append(op):
+                self.timepoints.append(tp)
+            elif type(time) is int:
+                while time >= len(self.timepoints):
+                    self._append_tp(Timepoint())
+                if not self.timepoints[time].can_append(op):
                     raise Exception('Cannot add operation to given timepoint.')
                 else:
-                    self._timepoints[insert].append(op)
+                    self.timepoints[time].append(op)
 
         else:
-            self._apply_encoded_operation(op, insert=insert)
+            self._apply_encoded_operation(op, time=time)
 
-    # def append(self, *args, insert=None):
+    # def append(self, *args, time=None):
     #     if len(args) == 1 and type(args[0]) is Operation:
     #         op = args[0]
 
@@ -298,22 +346,22 @@ class Circuit:
 
     #             op = Operation(args[0], [address2], [address1])
 
-    #     if insert is None:
-    #         if len(self._timepoints) == 0 \
-    #                 or not self._timepoints[-1].can_append(op):
+    #     if time is None:
+    #         if len(self.timepoints) == 0 \
+    #                 or not self.timepoints[-1].can_append(op):
     #             tp = Timepoint(op)
-    #             self._timepoints.append(tp)
+    #             self.timepoints.append(tp)
     #         else:
-    #             self._timepoints[-1].append(op)
+    #             self.timepoints[-1].append(op)
 
-    #     elif type(insert) is int:
-    #         if not self._timepoints[insert].can_append(op):
+    #     elif type(time) is int:
+    #         if not self.timepoints[time].can_append(op):
     #             raise Exception('Cannot add operation to given timepoint.')
     #         else:
-    #             self._timepoints[insert].append(op)
+    #             self.timepoints[time].append(op)
 
     def _append_tp(self, tp):
-        self._timepoints.append(tp.copy())
+        self.timepoints.append(tp.copy())
 
     def append_register(self, register):
         """
@@ -359,8 +407,8 @@ class Circuit:
         """
         self.physical_register = Register()
 
-        x = list(range(self.num_qubits))
-        self.physical_register.elements = [PhysicalQubit(i, 0, x[:i] + x[i+1:])
+        # x = list(range(self.num_qubits))
+        self.physical_register.elements = [PhysicalQubit(i, i, None)
                                            for i in range(self.num_qubits)]
 
         qa = self.register[0].qubit_addresses()
@@ -372,16 +420,16 @@ class Circuit:
 
         return self._layout_map
 
-    def _print_structure(self, depth=-1, levels=None):
+    def _structure(self, depth=-1, levels=None):
         if levels is None:
             for reg in self.register:
-                reg.print_structure(depth)
+                reg.structure(depth)
         elif type(levels) is int and levels < len(self.register):
-            self.register[levels].print_structure(depth)
+            self.register[levels].structure(depth)
         elif type(levels) is list:
             for i in levels:
                 if i < len(self.registers):
-                    self.register[i].print_structure(depth)
+                    self.register[i].structure(depth)
         else:
             raise TypeError('levels must be int or a list')
 
@@ -390,7 +438,7 @@ class Circuit:
         """TODO: Allow qubits at any level."""
         return self.register[0].num_qubits
 
-    def apply_circuit(self, other, new_base, insert=None):
+    def apply_circuit(self, other, new_base, time=None):
         """
         Apply other circuit to this circuit with a new base.
 
@@ -400,7 +448,7 @@ class Circuit:
             The circuit to be applied.
         new_base : tuple
             The base address at which to begin applying other circuit..
-        insert : int, optional
+        time : int, optional
             Timepoint index at which to apply the other circuit. The default is
             None.
 
@@ -416,39 +464,49 @@ class Circuit:
         None.
 
         """
-        qa = other.register.qubit_addresses()
-        L = len(new_base)
-        first_address_base = qa[0][0:L]
-        if any(address[0:L] != first_address_base for address in qa):
-            raise Exception('Base is not common to all qubits.')
+        # qa = other.register.qubit_addresses()
+        # L = len(new_base)
+        # first_address_base = qa[0][0:L]
+        # replace check with check on operations
+        # if any(address[0:L] != first_address_base for address in qa):
+        #     raise Exception('Base is not common to all qubits.')
 
-        if insert is None:
-            for tp in other._timepoints:
+        if time is None:
+            for tp in other.timepoints:
                 self._append_tp(tp.rebase_qubits(new_base))
         else:
-            # decide where to start inserting the timepoints
-            if insert >= 0 and insert < len(self._timepoints):
-                k = insert
-            elif insert == 0 and len(self._timepoints) == 0:
-                k = insert
-            elif insert < 0 and abs(insert) <= len(self._timepoints):
-                k = len(self._timepoints) + insert
+            # decide where to start timeing the timepoints
+            if time >= 0 and time < len(self.timepoints):
+                k = time
+            elif time == 0 and len(self.timepoints) == 0:
+                k = time
+            elif time < 0 and abs(time) <= len(self.timepoints):
+                k = len(self.timepoints) + time
             else:
-                raise KeyError('Invalid insert point.')
+                raise KeyError('Invalid time point.')
 
             # check to make sure we can actually insert from this point
-            for i, tp in enumerate(other._timepoints):
-                if k+i < len(self._timepoints):
-                    if not self._timepoints[k+i].can_add(
+            for i, tp in enumerate(other.timepoints):
+                if k+i < len(self.timepoints):
+                    if not self.timepoints[k+i].can_add(
                             tp.rebase_qubits(new_base)):
                         raise Exception('Cannot add circuits.')
 
             # add the timepoints
-            for i, tp in enumerate(other._timepoints):
-                if k+i < len(self._timepoints):
-                    self._timepoints[k+i].add(tp.rebase_qubits(new_base))
+            for i, tp in enumerate(other.timepoints):
+                if k+i < len(self.timepoints):
+                    # self.timepoints[k+i].add(tp.rebase_qubits(new_base))
+                    self.timepoints[k+i] += tp.rebase_qubits(new_base)
                 else:
                     self._append_tp(tp)
+
+    def start_repeat(self, repetitions):
+        self._append_tp(Timepoint())
+        self.timepoints[-1].repeat_start = True
+        self.timepoints[-1].repeat_repetitions = repetitions
+
+    def end_repeat(self):
+        self.timepoints[-1].repeat_end = True
 
     def __add__(self, other):
         """
@@ -465,17 +523,35 @@ class Circuit:
             The composition of the two circuits.
 
         """
-        new_circuit = Circuit()
+        if not self.register >= other.register:
+            raise Exception("Registers not compatible.")
 
-        for op in self:
-            new_circuit.append(op)
+        new_circuit = copy.deepcopy(self)
 
-        for op in other:
-            new_circuit.append(op)
+        new_circuit._append_tp(Timepoint())
+
+        for tp in other.timepoints:
+            for op in tp:
+                new_circuit.append(op)
 
         new_circuit.custom_gates = (self.custom_gates
                                     + '\n'
                                     + other.custom_gates)
+        return new_circuit
+
+    def __mul__(self, value):
+
+        new_circuit = copy.deepcopy(self)
+
+        for i in range(value-1):
+            for tp in self.timepoints:
+                for op in tp:
+                    new_circuit.append(op)
+
+            new_circuit._append_tp(Timepoint())
+
+        new_circuit.timepoints.pop()
+
         return new_circuit
 
     def qasm(self):
@@ -534,15 +610,26 @@ class Circuit:
             A string suitable for importing by stim.
 
         """
+        if not self._layout_map:
+            self.map_to_physical_layout()
         stim_str = ''
 
-        for op in self:
-            t = self.register[op.targets[0]].constituent_register.index
-            if not op.is_controlled:
-                stim_str += f'{op.name} {t}\n'
-            else:
-                c = self.register[op.controls[0]].constituent_register.index
-                stim_str += f'{op.name} {c} {t}\n'
+        indent = ''
+        for tp in self.timepoints:
+            if tp.repeat_start:
+                indent = '    '
+                stim_str += f'REPEAT {tp.repeat_repetitions}' + ' {\n'
+            for op in tp:
+                t = self.register[op.targets[0]].constituent_register.index
+                if not op.is_controlled:
+                    stim_str += indent + f'{op.name} {t}\n'
+                else:
+                    c = self.register[op.controls[0]
+                                      ].constituent_register.index
+                    stim_str += indent + f'{op.name} {c} {t}\n'
+            if tp.repeat_end:
+                indent = ''
+                stim_str += '}\n'
 
         return stim_str
 
@@ -688,20 +775,21 @@ class Circuit:
         if not self._layout_map:
             self.map_to_physical_layout()
 
+        num_qubits = self.num_qubits
         lm = self._layout_map.copy()
         lm.sort(key=lambda x: x[1])
         address_label_len = max(map(len, map(lambda x: str(x[0]), lm)))
-        index_label_len = 3 + len(str(self.num_qubits))
+        index_label_len = 3 + len(str(num_qubits))
         label_len = address_label_len + index_label_len
         circ_disp = [list(str(lm[i][0]).ljust(address_label_len)
                           + (' : ' + str(lm[i][1])).rjust(index_label_len)
-                     + space) for i in range(self.num_qubits)]
+                     + space) for i in range(num_qubits)]
         circ_disp2 = [list(space*(label_len+1))
-                      for _ in range(self.num_qubits)]
+                      for _ in range(num_qubits)]
 
         circ_tp_line = [space*(label_len+1)]
 
-        for tp in self._timepoints:
+        for tp in self.timepoints:
 
             slices = [[]]
             slices_touched_qubits = [[]]
@@ -738,7 +826,7 @@ class Circuit:
                     t = self.register[op.targets[0]].constituent_register.index
 
                     if not op.is_controlled:
-                        s = dash + op.name + dash
+                        s = dash + op.draw_str_target + dash
                         circ_disp[t].append(s)
                         circ_disp2[t].append(space*3)
                         touched_places.append(t)
@@ -747,7 +835,7 @@ class Circuit:
                         c = self.register[op.controls[0]
                                           ].constituent_register.index
                         vert_places = list(range(c, t)) + list(range(t, c))
-                        for i in range(self.num_qubits):
+                        for i in range(num_qubits):
                             if i == c:
                                 circ_disp[i].append(
                                     dash + op.draw_str_control + dash)
@@ -769,19 +857,178 @@ class Circuit:
                                 circ_disp2[i].append(space + vert + space)
                                 touched_places.append(i)
 
-                for i in range(self.num_qubits):
+                for i in range(num_qubits):
                     if i not in set(touched_places):
                         circ_disp[i].append(dash*3)
                         circ_disp2[i].append(space*3)
 
-        circ_disp_str = ''.join(circ_tp_line) + '\n'
-
-        for line1, line2 in zip(circ_disp, circ_disp2):
-            circ_disp_str += ''.join(line1) + '\n'
-            circ_disp_str += ''.join(line2) + '\n'
-
         if filename is None:
-            print(circ_disp_str)
+            file = sys.stdout
         else:
-            with open(filename, 'w') as f:
-                f.write(circ_disp_str)
+            file = open(filename, 'w')
+
+        print(''.join(circ_tp_line), file=file, flush=True)
+        for line1, line2 in zip(circ_disp, circ_disp2):
+            print(''.join(line1), file=file)
+            print(''.join(line2), file=file, flush=True)
+
+        # circ_disp_str = ''.join(circ_tp_line) + '\n'
+
+        # for line1, line2 in zip(circ_disp, circ_disp2):
+        #     circ_disp_str += ''.join(line1) + '\n'
+        #     circ_disp_str += ''.join(line2) + '\n'
+
+        # if filename is None:
+        #     print(circ_disp_str)
+        # else:
+        #     with open(filename, 'w') as f:
+        #         f.write(circ_disp_str)
+
+    def _draw_large(self, filename):
+        """
+        Draw a text version of the circuit.
+
+        Parameters
+        ----------
+        filename : str, optional
+            If filename is provided, then the output will be written to the
+            file. Otherwise, it will be printed out. The default is None.
+
+        Returns
+        -------
+        None.
+
+        """
+        dash = '─'
+        space = ' '
+        vert = '│'
+        folder = 'circfiles/'
+
+        if not self._layout_map:
+            self.map_to_physical_layout()
+
+        num_qubits = self.num_qubits
+        lm = self._layout_map.copy()
+        lm.sort(key=lambda x: x[1])
+        address_label_len = max(map(len, map(lambda x: str(x[0]), lm)))
+        index_label_len = 3 + len(str(num_qubits))
+        label_len = address_label_len + index_label_len
+        circ_disp = [list(str(lm[i][0]).ljust(address_label_len)
+                          + (' : ' + str(lm[i][1])).rjust(index_label_len)
+                     + space) for i in range(num_qubits)]
+        circ_disp2 = [list(space*(label_len+1))
+                      for _ in range(num_qubits)]
+
+        with open(folder + 'a', 'w') as file:
+            for line1, line2 in zip(circ_disp, circ_disp2):
+                print(''.join(line1), file=file)
+                print(''.join(line2), file=file, flush=True)
+
+        circ_tp_line = [space*(label_len+1)]
+
+        for tp_i, tp in enumerate(self.timepoints):
+            circ_disp = [[] for i in range(num_qubits)]
+            circ_disp2 = [[] for i in range(num_qubits)]
+
+            slices = [[]]
+            slices_touched_qubits = [[]]
+            for op_id, op in enumerate(tp.operations):
+
+                t = self.register[op.targets[0]].constituent_register.index
+
+                if not op.is_controlled:
+                    touched_by_op = [t]
+                else:
+                    c = self.register[op.controls[0]
+                                      ].constituent_register.index
+                    touched_by_op = list(range(c, t))\
+                        + list(range(t, c))
+                    touched_by_op.append(touched_by_op[-1]+1)
+
+                for s in range(len(slices)):
+                    if len(
+                            set(touched_by_op).intersection(
+                                set(slices_touched_qubits[s]))) == 0:
+                        slices[s].append(op)
+                        slices_touched_qubits[s] += touched_by_op
+                        break
+                else:
+                    slices.append([op])
+                    slices_touched_qubits.append(touched_by_op)
+
+            circ_tp_line.append('⍿' + space*(3*(len(slices)-1)+2))
+
+            for sl in slices:
+                touched_places = []
+
+                for op in sl:
+                    t = self.register[op.targets[0]].constituent_register.index
+
+                    if not op.is_controlled:
+                        s = dash + op.draw_str_target + dash
+                        circ_disp[t].append(s)
+                        circ_disp2[t].append(space*3)
+                        touched_places.append(t)
+
+                    elif op.is_controlled:
+                        c = self.register[op.controls[0]
+                                          ].constituent_register.index
+                        vert_places = list(range(c, t)) + list(range(t, c))
+                        for i in range(num_qubits):
+                            if i == c:
+                                circ_disp[i].append(
+                                    dash + op.draw_str_control + dash)
+                                if i == vert_places[0]:
+                                    circ_disp2[i].append(space + vert + space)
+                                else:
+                                    circ_disp2[i].append(space*3)
+                                touched_places.append(i)
+                            elif i == t:
+                                circ_disp[i].append(
+                                    dash + op.draw_str_target + dash)
+                                if i == vert_places[0]:
+                                    circ_disp2[i].append(space + vert + space)
+                                else:
+                                    circ_disp2[i].append(space*3)
+                                touched_places.append(i)
+                            elif i in vert_places[1:]:
+                                circ_disp[i].append(dash + '┼' + dash)
+                                circ_disp2[i].append(space + vert + space)
+                                touched_places.append(i)
+
+                for i in range(num_qubits):
+                    if i not in set(touched_places):
+                        circ_disp[i].append(dash*3)
+                        circ_disp2[i].append(space*3)
+
+            with open(folder + 'b' + str(tp_i), 'w') as file:
+                for line1, line2 in zip(circ_disp, circ_disp2):
+                    print(''.join(line1), file=file)
+                    print(''.join(line2),
+                          file=file,
+                          flush=True)
+
+            # # move the current file to temp file
+            # move(folder + filename, folder + "temp")
+
+            # now write the current timepoint to final file
+            # with open(folder + filename, 'w') as writefile, \
+            #     open(folder + "temp", 'r') as existing:
+            #         for line1, line2 in zip(circ_disp, circ_disp2):
+            #             print(existing.readline()[:-1] + ''.join(line1),
+            #                   file=writefile)
+            #             print(existing.readline()[:-1] + ''.join(line2),
+            #                   file=writefile,
+            #                   flush=True)
+
+            # del circ_disp, circ_disp2
+            # gc.collect()
+            # print(tp_i)
+
+        # file = open(filename, 'w')
+
+        # print(''.join(circ_tp_line), file=file, flush=True)
+        # for line1, line2 in zip(circ_disp, circ_disp2):
+        #     print("line")
+        #     print(''.join(line1), file=file)
+        #     print(''.join(line2), file=file, flush=True)

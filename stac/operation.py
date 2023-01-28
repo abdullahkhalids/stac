@@ -5,7 +5,8 @@ class Operation:
 
     _draw_str_target_dic = {'CX': '⊕',
                             'CY': 'Y',
-                            'CZ': '●'}
+                            'CZ': '●',
+                            'MR': 'm'}
 
     def __init__(self,
                  name,

@@ -50,22 +50,32 @@ class Register:
     def __iter__(self):
         return self.elements.__iter__()
 
-    def __getitem__(self, value):
+    def __getitem__(self, s):
         """Make register subscriptable."""
-        if type(value) is int:
-            return self.elements.__getitem__(value)
-
-        s = 'self'
-        for i, index in enumerate(value):
-            if type(index) is int:
-                s += f'.elements[{index}]'
+        if type(s) is int:
+            return self.elements.__getitem__(s)
+        elif type(s) is tuple and all(map(lambda v: type(v) is int, s[:-1])):
+            reg = self
+            for t in s:
                 try:
-                    eval(s)
+                    reg = reg.elements[t]
                 except IndexError:
                     error_message = f'The register does not contain a \
-subregister or qubit at {value[:i+1]}'
+subregister or qubit at {s}.'
                     raise IndexError(error_message)
-        return eval(s)
+            return reg
+        else:
+            raise TypeError('Cannot recognize subscript.')
+
+    def __ge__(self, other):
+
+        self_addresses = set(self.qubit_addresses())
+        other_addresses = set(other.qubit_addresses())
+
+        if other_addresses.issubset(self_addresses):
+            return True
+        else:
+            return False
 
     def append(self, *registers):
         # apply appropriate checks
@@ -87,7 +97,7 @@ subregister or qubit at {value[:i+1]}'
         else:
             return sum([register.num_qubits for register in self.elements])
 
-    def print_structure(self, depth=-1):
+    def structure(self, depth=-1):
         """
         Print the register structure.
 
@@ -95,11 +105,6 @@ subregister or qubit at {value[:i+1]}'
         ----------
         max_depth : TYPE, optional
             DESCRIPTION. The default is -1.
-
-        Returns
-        -------
-        TYPE
-            DESCRIPTION.
 
         """
         if depth == -1:
@@ -150,17 +155,24 @@ subregister or qubit at {value[:i+1]}'
         determine_structure(self, tuple())
         return address_list
 
-    @property
-    def qubits(self):
-        def iterator(register):
+    def qubits(self, register_type=None):
+        def iterator(register, certain_yield=False):
             if type(register) is RegisterRegister:
                 for child_register in register:
-                    yield from iterator(child_register)
-            else:
+                    if (child_register.register_type == register_type
+                            or certain_yield):
+                        yield from iterator(child_register, True)
+                    else:
+                        yield from iterator(child_register)
+            elif (register_type is None
+                  or certain_yield
+                  or register.register_type == register_type):
                 for qubit in register:
                     yield qubit
-
-        return iterator(self)
+        if self.register_type == register_type:
+            return iterator(self, True)
+        else:
+            return iterator(self)
 
 
 class QubitRegister(Register):
@@ -228,10 +240,20 @@ class RegisterRegister(Register):
     def index(self, value):
         self._index = value
 
-    def _create_encoded_qubit_register(self):
-        n = self.attached_code.num_physical_qubits
-        datareg = QubitRegister('d', self.level, n)
-        genregs = [QubitRegister('g', self.level, sum(g))
-                   for g in self.attached_code.generator_matrix]
-        syndreg = RegisterRegister('s', 0, genregs)
-        self.append(datareg, syndreg)
+    # def _create_encoded_qubit_register(self):
+    #     n = self.attached_code.num_physical_qubits
+    #     datareg = QubitRegister('d', self.level, n)
+    #     genregs = [QubitRegister('g', self.level, sum(g))
+    #                for g in self.attached_code.generator_matrix]
+    #     syndreg = RegisterRegister('s', 0, genregs)
+    #     self.append(datareg, syndreg)
+
+    def constituent_register_mapping(self):
+
+        mapping = []
+
+        for address in reversed(self.qubit_addresses()):
+            if self[address].constituent_register is not None:
+                mapping.append([address, self[address].constituent_register])
+
+        return mapping

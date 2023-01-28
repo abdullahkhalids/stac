@@ -8,6 +8,10 @@ class Timepoint:
     def __init__(self, new_op=None):
         self.operations = []
         self.affected_qubits = set()
+        self.repeat_start = False
+        self.repeat_end = False
+        self.repeat_repetitions = None
+
         if new_op is not None:
             self.append(new_op)
 
@@ -33,7 +37,7 @@ class Timepoint:
         copied_tp = Timepoint()
         for op in self.operations:
             copied_tp.append(op.copy())
-            
+
         return copied_tp
 
     def append(self, new_op):
@@ -67,6 +71,24 @@ class Timepoint:
                 return False
         else:
             return True
+
+    def __add__(self, tp2):
+
+        tp = self.copy()
+
+        if self.can_add(tp2):
+            for op in tp2:
+                tp.append(op.copy())
+
+        return tp
+    
+    def __iadd__(self, tp2):
+
+        if self.can_add(tp2):
+            for op in tp2:
+                self.append(op.copy())
+
+        return self
 
     def add(self, tp2):
         for op in tp2:
