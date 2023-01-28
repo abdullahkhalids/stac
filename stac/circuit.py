@@ -7,12 +7,7 @@ from .supportedoperations import _zero_qubit_operations,\
     _one_qubit_operations, _two_qubit_operations
 
 import textwrap
-
-
-# from IPython.display import display
 import sys
-from shutil import move
-import gc
 
 
 import json
@@ -318,48 +313,6 @@ class Circuit:
         else:
             self._apply_encoded_operation(op, time=time)
 
-    # def append(self, *args, time=None):
-    #     if len(args) == 1 and type(args[0]) is Operation:
-    #         op = args[0]
-
-    #     else:
-    #         if type(args[1]) is tuple:
-    #             address1 = self.base_address + args[1]
-    #         elif type(args[1]) is int:
-    #             address1 = self.base_address + tuple([args[1]])
-    #         else:
-    #             raise Exception('Not a valid operation')
-
-    #         self.register.check_address(address1)
-
-    #         if len(args) == 2:
-    #             op = Operation(args[0], [address1])
-    #         else:
-    #             if type(args[2]) is tuple:
-    #                 address2 = self.base_address + args[2]
-    #             elif type(args[2]) is int:
-    #                 address2 = self.base_address + tuple([args[2]])
-    #             else:
-    #                 raise Exception('Not a valid operation')
-
-    #             self.register.check_address(address2)
-
-    #             op = Operation(args[0], [address2], [address1])
-
-    #     if time is None:
-    #         if len(self.timepoints) == 0 \
-    #                 or not self.timepoints[-1].can_append(op):
-    #             tp = Timepoint(op)
-    #             self.timepoints.append(tp)
-    #         else:
-    #             self.timepoints[-1].append(op)
-
-    #     elif type(time) is int:
-    #         if not self.timepoints[time].can_append(op):
-    #             raise Exception('Cannot add operation to given timepoint.')
-    #         else:
-    #             self.timepoints[time].append(op)
-
     def _append_tp(self, tp):
         self.timepoints.append(tp.copy())
 
@@ -495,7 +448,6 @@ class Circuit:
             # add the timepoints
             for i, tp in enumerate(other.timepoints):
                 if k+i < len(self.timepoints):
-                    # self.timepoints[k+i].add(tp.rebase_qubits(new_base))
                     self.timepoints[k+i] += tp.rebase_qubits(new_base)
                 else:
                     self._append_tp(tp)
@@ -743,8 +695,6 @@ class Circuit:
 
         """
         stim_circ = stim.Circuit(self.stim())
-        # print(stim_circ)
-        # print("\n\n\n")
         sample = stim_circ.compile_sampler().sample(1)[0]
 
         if print_sample:
@@ -872,18 +822,6 @@ class Circuit:
             print(''.join(line1), file=file)
             print(''.join(line2), file=file, flush=True)
 
-        # circ_disp_str = ''.join(circ_tp_line) + '\n'
-
-        # for line1, line2 in zip(circ_disp, circ_disp2):
-        #     circ_disp_str += ''.join(line1) + '\n'
-        #     circ_disp_str += ''.join(line2) + '\n'
-
-        # if filename is None:
-        #     print(circ_disp_str)
-        # else:
-        #     with open(filename, 'w') as f:
-        #         f.write(circ_disp_str)
-
     def _draw_large(self, filename):
         """
         Draw a text version of the circuit.
@@ -1007,28 +945,3 @@ class Circuit:
                     print(''.join(line2),
                           file=file,
                           flush=True)
-
-            # # move the current file to temp file
-            # move(folder + filename, folder + "temp")
-
-            # now write the current timepoint to final file
-            # with open(folder + filename, 'w') as writefile, \
-            #     open(folder + "temp", 'r') as existing:
-            #         for line1, line2 in zip(circ_disp, circ_disp2):
-            #             print(existing.readline()[:-1] + ''.join(line1),
-            #                   file=writefile)
-            #             print(existing.readline()[:-1] + ''.join(line2),
-            #                   file=writefile,
-            #                   flush=True)
-
-            # del circ_disp, circ_disp2
-            # gc.collect()
-            # print(tp_i)
-
-        # file = open(filename, 'w')
-
-        # print(''.join(circ_tp_line), file=file, flush=True)
-        # for line1, line2 in zip(circ_disp, circ_disp2):
-        #     print("line")
-        #     print(''.join(line1), file=file)
-        #     print(''.join(line2), file=file, flush=True)

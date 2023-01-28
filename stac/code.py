@@ -5,7 +5,7 @@ from IPython.display import display, Math
 import numpy as np
 
 # from .operation import Operation
-from .timepoint import Timepoint
+# from .timepoint import Timepoint
 # from .qubit import PhysicalQubit, VirtualQubit
 from .register import QubitRegister, RegisterRegister
 from .circuit import Circuit
@@ -486,8 +486,7 @@ class Code:
                                                 level,
                                                 syndrome_measurement_type):
         """
-        Create a register appropriate for doing syndrome measurements for
-        qubits encoded by this code.
+        Create a register appropriate for doing syndrome measurements.
 
         Parameters
         ----------
@@ -590,8 +589,6 @@ class Code:
         r = self.rankx
 
         self.encoding_circuit = Circuit()
-        # rg = QubitRegister('d', 0, n)
-        # self.encoding_circuit.append_register(rg)
         self.encoding_circuit.append_register(
             self.construct_encoded_qubit_register(0, 'non_ft'))
         self.encoding_circuit.base_address = (0, 0, 0)
@@ -708,7 +705,6 @@ class Code:
         self.syndrome_circuit.append_register(rg)
 
         for i in range(self.num_generators):
-            # first apply hadamard to ancilla
             self.syndrome_circuit.append("H", (0, 0, 1, i, 0))
 
         for i in range(self.num_generators):
@@ -731,12 +727,9 @@ class Code:
             self.syndrome_circuit.cur_time += 1
 
         for i in range(0, self.num_generators):
-            # last apply hadamard to ancilla
             self.syndrome_circuit.append("H", (0, 0, 1, i, 0))
 
-        # self.syndrome_circuit.append('MR', (0, 0, 1, 0, 0), time=[1])
         for i in range(0, self.num_generators):
-            # change to MR
             self.syndrome_circuit.append('MR', (0, 0, 1, i, 0))
 
         return self.syndrome_circuit

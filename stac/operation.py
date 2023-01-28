@@ -1,18 +1,20 @@
-import copy
+"""Provide a class for operations in circuits."""
+from typing import Optional
 
 
 class Operation:
+    """Class to represent operations in circuits."""
 
-    _draw_str_target_dic = {'CX': '⊕',
-                            'CY': 'Y',
-                            'CZ': '●',
-                            'MR': 'm'}
+    _draw_str_target_dic: dict = {'CX': '⊕',
+                                  'CY': 'Y',
+                                  'CZ': '●',
+                                  'MR': 'm'}
 
     def __init__(self,
-                 name,
-                 targets,
-                 controls=None,
-                 classical_control=None):
+                 name: str,
+                 targets: list[tuple],
+                 controls: Optional[list[tuple]] = None,
+                 classical_control: None = None) -> None:
         self.name = name
         self.targets = targets.copy()
         self.num_affected_qubits = len(targets)
@@ -31,7 +33,8 @@ class Operation:
         else:
             self.is_controlled = False
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return a representation of the object."""
         if self.is_controlled:
             return ' '.join([self.name,
                             str(self.controls[0]),
@@ -40,10 +43,12 @@ class Operation:
             return ' '.join([self.name,
                             str(self.targets[0])])
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Return a string representation of the object."""
         return self.__repr__()
 
-    def copy(self):
+    def copy(self) -> 'Operation':
+        """Return copy of class."""
         copied_op = Operation(self.name,
                               [],
                               controls=None,
@@ -65,7 +70,24 @@ class Operation:
 
         return copied_op
 
-    def rebase_qubits(self, new_base):
+    def rebase_qubits(self,
+                      new_base: tuple) -> 'Operation':
+        """
+        Create Operation with new base address of the controls and targets.
+
+        Parameters
+        ----------
+        new_base : tuple
+            The base address to replace the existing base. This can be any
+            length shorter than the length of the smallest address within the
+            controls and targets.
+
+        Returns
+        -------
+        Operation
+            A new Operation with new base address.
+
+        """
         L = len(new_base)
         new_targets = [new_base + q[L:] for q in self.targets]
         if self.is_controlled:
