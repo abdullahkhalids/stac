@@ -8,6 +8,15 @@ class Timepoint:
 
     def __init__(self,
                  new_op: Operation = None) -> None:
+        """
+        Construct a Timepoint.
+
+        Parameters
+        ----------
+        new_op : Operation, optional
+            This operation will be appended to the Timepoint. The default is
+            None.
+        """
         self.operations: list[Operation] = []
         self.affected_qubits: set[tuple] = set()
         self.repeat_start = False
@@ -59,10 +68,6 @@ class Timepoint:
         ------
         Exception
             If new_op can't be appended to current Timepoint.
-
-        Returns
-        -------
-        None.
 
         """
         possible_intersections = self.affected_qubits \

@@ -15,6 +15,25 @@ class Operation:
                  targets: list[tuple],
                  controls: Optional[list[tuple]] = None,
                  classical_control: None = None) -> None:
+        """
+        Construct Operation object.
+
+        Parameters
+        ----------
+        name : str
+            Name of operation.
+        targets : list[tuple]
+            List of addresses that the operation targets.
+        controls : Optional[list[tuple]], optional
+            If this is a quantum-controlled operation, then this is a list of
+            addresses that control the operation. The default is None.
+        classical_control : None, optional
+            This parameter is unused at the moment. The default is None.
+
+        This contructor does no checks on whether the name, controls or targets
+        are valid. These checks should be done when appending the operation
+        to the circuit.
+        """
         self.name = name
         self.targets = targets.copy()
         self.num_affected_qubits = len(targets)

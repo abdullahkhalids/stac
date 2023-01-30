@@ -1,14 +1,32 @@
 """Provide a module to concatenate quantum codes."""
+from typing import Any
 import numpy as np
-# import stim
-# import copy
 from .code import Code
 
 
 class ConcatCode(Code):
+    """Class to create concatenated codes."""
 
-    def __init__(self, *args):
+    def __init__(self, *args: Any) -> None:
+        """
+        Construct a concatenated code.
 
+        Parameters
+        ----------
+        *args:
+            Can be on eof the following
+        tuple[Code]
+            A tuple of codes that will be concatenated in order.
+        tuple[Code, int]
+        The Code will be concatenated with itself.
+
+        Raises
+        ------
+        TypeError
+            DESCRIPTION.
+
+
+        """
         if len(args) == 1 and type(args[0]) == tuple:
             self.concat_sequence = args[0]
         elif (len(args) == 2
@@ -53,8 +71,26 @@ class ConcatCode(Code):
         self.generator_matrix = concat_generator_matrix
         return self.generator_matrix
 
-    def _construct_generator_matrix_concat_k2_divides_n1(self, code1, code2):
+    def _construct_generator_matrix_concat_k2_divides_n1(self,
+                                                         code1: Code,
+                                                         code2: Code
+                                                         ) -> Any:
+        """
+        Construct concatenatenated generators when k_2 divides n_1.
 
+        Parameters
+        ----------
+        code1 : Code
+            First code.
+        code2 : Code
+            Second code.
+
+        Returns
+        -------
+        numpy.ndarray
+            The generator matrix of the concatenated code.
+
+        """
         n1 = code1.num_physical_qubits
         k1 = code1.num_logical_qubits
         m1 = code1.num_generators
@@ -122,8 +158,27 @@ class ConcatCode(Code):
 
         return new_gens
 
-    def _construct_generator_matrix_concat_k2_not_divides_n1(self,
-                                                             code1, code2):
+    def _construct_generator_matrix_concat_k2_not_divides_n1(
+            self,
+            code1: Code,
+            code2: Code
+            ) -> Any:
+        """
+        Construct concatenatenated generators when k_2 does not divide n_1.
+
+        Parameters
+        ----------
+        code1 : Code
+            First code.
+        code2 : Code
+            Second code.
+
+        Returns
+        -------
+        numpy.ndarray
+            The generator matrix of the concatenated code.
+
+        """
         n1 = code1.num_physical_qubits
         k1 = code1.num_logical_qubits
         m1 = code1.num_generators
