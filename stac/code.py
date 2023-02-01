@@ -1,4 +1,5 @@
 """Stac is a stabilizer code module."""
+from typing import Any, Optional
 
 from itertools import combinations
 from IPython.display import display, Math
@@ -12,7 +13,9 @@ from .circuit import Circuit
 from .supportedoperations import _quantum_operations
 
 
-def print_matrix(array, augmented=False):
+def print_matrix(array: Any,
+                 augmented: bool = False
+                 ) -> None:
     """
     Display an array using latex.
 
@@ -48,7 +51,7 @@ def print_matrix(array, augmented=False):
         display(Math(f'\\begin{matname}\n {data}\\end{matname}'))
 
 
-def print_paulis(G):
+def print_paulis(G: Any) -> None:
     """Print a set of Paulis as I,X,Y,Z."""
     if G.ndim == 1:
         m = 1
@@ -73,7 +76,7 @@ def print_paulis(G):
         display(Math(f'${pauli_str}$'))
 
 
-def print_paulis_indexed(G):
+def print_paulis_indexed(G: Any) -> None:
     """Print a set of Paulis as indexed X,Y,Z."""
     if len(G.shape) == 1:
         m = 1
@@ -99,14 +102,30 @@ def print_paulis_indexed(G):
             display(Math(f'${pauli_str}$'))
 
 
-def _rref(A, colswap=True):
+def _rref(A: Any,
+          colswap: bool = True) -> tuple[Any, int, list]:
     """
-    Operations to row reduce.
+    Produce reduced row echelon form (RREF) of a matrix.
 
-    Determine the set of elementary operations
-    that give the reduced row echelon form (RREF) of A
-    Returns the matrix rank, reduced matrix,
-    and operations.
+    Parameters
+    ----------
+    A : numpy.array
+        The matrix to reduce.
+    colswap : bool, optional
+        Whether to swap the columns to place identity at the left. The default
+        is True.
+
+    Returns
+    -------
+    M : numpy.array
+        The reduced matrix.
+    r : int
+        The rank of the matrix.
+    ops: list
+        The set of elementary row operations to reduce A to M. Each operation
+        is a list of length three. The first entry is one of {colswap, rowswap
+        addrow}. The next two arguments determine which rows to swap or add.
+
     """
     M = np.copy(A)
     (nrow, ncol) = M.shape
@@ -163,13 +182,28 @@ def _rref(A, colswap=True):
     return M, rank, ops
 
 
-def _perform_row_operations(A, ops, start_row=0):
+def _perform_row_operations(A: Any,
+                            ops: list,
+                            start_row: int = 0) -> Any:
     """
-    Perform row operations on a matrix.
+    Perform elementary operations on a matrix.
 
-    Apply a set of elementary row operations, ops,
-    to matrix A. If start_row is specified, then
-    operations are performed relative to it.
+    Parameters
+    ----------
+    A : numpy.array
+        The matrix on which to do the operations.
+    ops : list
+        The set of elementary row operations to reduce A to M. Each operation
+        is a list of length three. The first entry is one of {colswap, rowswap
+        addrow}. The next two arguments determine which rows to swap or add.
+    start_row : int, optional
+        Shift the start row of the operations. The default is 0.
+
+    Returns
+    -------
+    M : numpy.array
+        The matrix on which all operations have been performed.
+
     """
     M = np.copy(A)
 
@@ -186,8 +220,23 @@ def _perform_row_operations(A, ops, start_row=0):
     return M
 
 
-def _inner_product(v, w):
+def _inner_product(v: Any, w: Any) -> int:
+    """
+    Compute the symplectic inner product between two vectors.
 
+    Parameters
+    ----------
+    v : numpy.array
+        Should have one row. Columns should be even.
+    w : numpy.array
+        Should have one row. Columns should be even.
+
+    Returns
+    -------
+    int
+        The symplectic inner product between v and w.
+
+    """
     n = int(len(v)/2)
     return (v[:n]@w[n:] + v[n:]@w[:n]) % 2
 
@@ -195,8 +244,25 @@ def _inner_product(v, w):
 class Code:
     """Class for creating stabilizer codes."""
 
-    def __init__(self, *args):
-        """Construct a stabilizer code."""
+    def __init__(self, *args: Any) -> None:
+        """
+        Construct a stabilizer code.
+
+        Parameters
+        ----------
+        There are multiple choices for construction. One choice is
+
+        generator_matrix : numpy.array
+            The Code is constructed using this generator matrix.
+
+        Another option is,
+
+        generators_x : numpy.array
+        generators_z : numpy.array
+            Pass two matrices of the same shape, that describe the X part and
+            the Z art of the code.
+
+        """
         if len(args) == 1:
             self.generator_matrix = args[0]
 
@@ -225,7 +291,7 @@ class Code:
         self.num_logical_qubits = self.num_physical_qubits \
             - self.num_generators
 
-        self.distance = None
+        self.distance: Optional[int] = None
 
         self.rankx = None
 
@@ -237,25 +303,33 @@ class Code:
 
         self.logical_xs = None
         self.logical_zs = None
-        self.logical_circuits = dict()
+        self.logical_circuits: dict[str, Optional[Circuit]] = dict()
         for op in _quantum_operations:
             self.logical_circuits[op] = None
 
         self.encoding_circuit = None
         self.decoding_circuit = None
 
-    def __repr__(self):
-        """Return way to make code."""
+    def __repr__(self) -> str:
+        """Return a representation of the object."""
         pass
         return f'Code(\n{self.generator_matrix}\n)'
 
-    def __str__(self):
-        """Return description of code."""
+    def __str__(self) -> str:
+        """Return a string representation of the object."""
         return 'A [[{},{}]] code'.format(self.num_physical_qubits,
                                          self.num_logical_qubits)
 
-    def check_valid_code(self):
-        """Check if code generators commute."""
+    def check_valid_code(self) -> bool:
+        """
+        Check if code generators commute.
+
+        Returns
+        -------
+        bool
+            True if the code generators commute, false otherwise.
+
+        """
         is_valid = True
         for i in range(self.num_generators-1):
             for j in range(i+1, self.num_generators):
@@ -270,17 +344,17 @@ class Code:
 
         return is_valid
 
-    def construct_standard_form(self):
+    def construct_standard_form(self) -> (Any, Any, int):
         """
         Construct the standard form a stabilizer matrix.
 
         Returns
         -------
-        standard_generators_x
+        standard_generators_x: numpy.array
             The X part of the standard generator matrix.
-        standard_generators_z
+        standard_generators_z: numpy.array
             The Z part of a standard generator matix.
-        rankx
+        rankx: int
             The rank of the X part of the generator matrix..
 
         """
@@ -314,7 +388,7 @@ class Code:
             self.standard_generators_z,\
             self.rankx
 
-    def construct_logical_operators(self):
+    def construct_logical_operators(self) -> (Any, Any):
         """
         Construct logical operators for the code.
 
@@ -322,9 +396,9 @@ class Code:
 
         Returns
         -------
-        logical_xs
+        logical_xs: numpy.array
             Array of logical xs. Each row is an operator.
-        logical_zs
+        logical_zs: numpy.array
             Array of logical xs. Each row is an operator.
         """
         if self.standard_generators_x is None:
@@ -359,16 +433,19 @@ class Code:
 
         return self.logical_xs, self.logical_zs
 
-    def construct_logical_gate_circuits(self,
-                                        syndrome_measurement_type='non_ft'):
+    def construct_logical_gate_circuits(
+            self,
+            syndrome_measurement_type: str = 'non_ft'
+            ):
         """
         Create the circuits that implement logical circuits for the code.
 
         Results are storted in logical_circuits.
 
-        Returns
-        -------
-        None.
+        Parameters
+        ----------
+        syndrome_measurement_type: str
+            Options are 'non_ft', 'cat'
 
         """
         if self.logical_xs is None:
@@ -437,8 +514,6 @@ class Code:
         -------
         destab_gen_mat: numpy.array
             Array of shape m x 2n where each row is a destabilizer
-        TYPE
-            DESCRIPTION.
 
         """
         if self.standard_generators_x is None:
@@ -482,9 +557,11 @@ class Code:
         self.destab_gen_mat = np.array(destabs)
         return self.destab_gen_mat
 
-    def construct_syndrome_measurement_register(self,
-                                                level,
-                                                syndrome_measurement_type):
+    def construct_syndrome_measurement_register(
+            self,
+            level: int,
+            syndrome_measurement_type: str = 'non_ft'
+            ) -> RegisterRegister:
         """
         Create a register appropriate for doing syndrome measurements.
 
@@ -497,7 +574,7 @@ class Code:
                         'cat',
                         'cat_standard'.
             With the 'standard' postfix uses the standard form of the
-            generators. If no argument, then 'non_ft' is Default.
+            generators. 'non_ft' is Default.
 
         Returns
         -------
@@ -522,12 +599,14 @@ class Code:
                                      level,
                                      subregisters=(cat_reg, detect_reg)))
         else:
-            raise Exception("Unknown 'syndrome_measurement_type'")
+            raise Exception("Unknown syndrome_measurement_type")
         return RegisterRegister('s', level, genregs, code=self)
 
-    def construct_encoded_qubit_register(self,
-                                         level,
-                                         syndrome_measurement_type):
+    def construct_encoded_qubit_register(
+            self,
+            level: int,
+            syndrome_measurement_type: str = 'non_ft'
+            ) -> RegisterRegister:
         """
         Create a register appropriate for creating an encoded qubit.
 
@@ -537,11 +616,10 @@ class Code:
             The concatenation level of the qubit.
         syndrome_measurement_type : str
             Options are 'non_ft',
-                        'non_ft_standard',
                         'cat',
                         'cat_standard'.
             With the 'standard' postfix uses the standard form of the
-            generators. If no argument, then 'non_ft' is Default.
+            generators. 'non_ft' is Default.
 
         Returns
         -------
@@ -571,7 +649,7 @@ class Code:
                                 subregisters=(datareg, syndreg),
                                 code=self)
 
-    def construct_encoding_circuit(self):
+    def construct_encoding_circuit(self) -> Circuit:
         """
         Construct an encoding circuit for the code using Gottesman's method.
 
@@ -614,7 +692,7 @@ class Code:
 
         return self.encoding_circuit
 
-    def construct_decoding_circuit(self):
+    def construct_decoding_circuit(self) -> Circuit:
         """
         Construct an decoding circuit for the code using Gottesman's method.
 
@@ -649,12 +727,14 @@ class Code:
 
         return self.decoding_circuit
 
-    def construct_syndrome_circuit(self, *args):
+    def construct_syndrome_circuit(self,
+                                   syndrome_measurement_type: str = 'non_ft'
+                                   ) -> Circuit:
         """
         Construct a circuit to measure the stabilizers of the code.
 
         ----------
-        *args : str
+        syndrome_measurement_type : str
             Options are 'non_ft',
                         'non_ft_standard',
                         'cat',
@@ -668,38 +748,51 @@ class Code:
             The circuit for measuring the stabilizers.
 
         """
-        if len(args) == 0:
-            self.syndrome_circuit = self._construct_syndrome_circuit_simple(
-                self.generators_x, self.generators_z)
-        elif type(args[0]) is str:
-            if args[0] == 'non_ft':
-                self.syndrome_circuit = \
-                    self._construct_syndrome_circuit_simple(self.generators_x,
-                                                            self.generators_z)
-            elif args[0] == 'non_ft_standard':
-                if self.standard_generators_x is None:
-                    self.construct_standard_form()
-                self.syndrome_circuit = \
-                    self._construct_syndrome_circuit_simple(
-                        self.standard_generators_x,
-                        self.standard_generators_z)
+        if syndrome_measurement_type == 'non_ft':
+            self.syndrome_circuit = \
+                self._construct_syndrome_circuit_simple(self.generators_x,
+                                                        self.generators_z)
+        elif syndrome_measurement_type == 'non_ft_standard':
+            if self.standard_generators_x is None:
+                self.construct_standard_form()
+            self.syndrome_circuit = \
+                self._construct_syndrome_circuit_simple(
+                    self.standard_generators_x,
+                    self.standard_generators_z)
 
-            elif args[0] == 'cat':
-                self.syndrome_circuit = \
-                    self._construct_syndrome_circuit_cat(self.generators_x,
-                                                         self.generators_z)
-            elif args[0] == 'cat_standard':
-                if self.standard_generators_x is None:
-                    self.construct_standard_form()
-                self.syndrome_circuit = \
-                    self._construct_syndrome_circuit_cat(
-                        self.standard_generators_x,
-                        self.standard_generators_z)
+        elif syndrome_measurement_type == 'cat':
+            self.syndrome_circuit = \
+                self._construct_syndrome_circuit_cat(self.generators_x,
+                                                     self.generators_z)
+        elif syndrome_measurement_type == 'cat_standard':
+            if self.standard_generators_x is None:
+                self.construct_standard_form()
+            self.syndrome_circuit = \
+                self._construct_syndrome_circuit_cat(
+                    self.standard_generators_x,
+                    self.standard_generators_z)
 
         return self.syndrome_circuit
 
-    def _construct_syndrome_circuit_simple(self, generators_x, generators_z):
-        """Construct a non-fault tolerant syndrome circuit."""
+    def _construct_syndrome_circuit_simple(self,
+                                           generators_x: Any,
+                                           generators_z: Any
+                                           ) -> Circuit:
+        """
+        Construct a non-fault tolerant syndrome circuit.
+
+        Parameters
+        ----------
+        generators_x : numpy.array
+        generators_z : numpy.array
+            The X and Z generators.
+
+        Returns
+        -------
+        Circuit
+            The syndrome circuit.
+
+        """
         self.syndrome_circuit = Circuit()
         rg = self.construct_encoded_qubit_register(0, 'non_ft')
         self.syndrome_circuit.append_register(rg)
@@ -734,8 +827,25 @@ class Code:
 
         return self.syndrome_circuit
 
-    def _construct_syndrome_circuit_cat(self, generators_x, generators_z):
-        """Construct a fault tolerant syndrome circuit."""
+    def _construct_syndrome_circuit_cat(self,
+                                        generators_x: Any,
+                                        generators_z: Any
+                                        ) -> Circuit:
+        """
+        Construct a fault tolerant syndrome circuit.
+
+        Parameters
+        ----------
+        generators_x : numpy.array
+        generators_z : numpy.array
+            The X and Z generators.
+
+        Returns
+        -------
+        Circuit
+            The syndrome circuit.
+
+        """
         self.syndrome_circuit = Circuit()
         rg = self.construct_encoded_qubit_register(0, 'cat')
         self.syndrome_circuit.append_register(rg)

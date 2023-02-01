@@ -1,4 +1,5 @@
 """Provide a module to create and manipulate quantum circuits."""
+from typing import Any, Iterator, Union, Optional, Callable
 from .operation import Operation
 from .timepoint import Timepoint
 from .qubit import PhysicalQubit  # , VirtualQubit
@@ -19,7 +20,8 @@ import tabulate
 tabulate.PRESERVE_WHITESPACE = True
 
 
-def display_states(head, *args):
+def display_states(head,
+                   *args: list[list]):
     """
     Display states as a pretty table.
 
@@ -70,28 +72,34 @@ def display_states(head, *args):
 class Circuit:
     """Class for creating and manipulating quantum circuits."""
 
-    def __init__(self, *args):
-        """Construct a quantum circuit."""
-        self.timepoints = []
+    def __init__(self, *args: Any) -> None:
+        """Construct a quantum circuit.
+
+        Parameters
+        ----------
+        Register:
+            If passed, then the Register is appended to the circuit.
+        """
+        self.timepoints: list[Timepoint] = []
         self._cur_time = 0
 
         self.register = RegisterRegister('circuit', -2)
         self.register.index = 0
 
         self.register.append(RegisterRegister('level0', -1))
-        self.register.structure = self._structure
+        self.register.structure = self._structure  # type: ignore
 
-        if (len(args) > 0
+        if (len(args) == 1
                 and type(args[0]) in [RegisterRegister, QubitRegister]):
             self.append_register(args[0])
 
-        self.base_address = tuple()
+        self.base_address: Any = tuple()
 
         self._layout_map = None
         self.custom_gates = ''
 
     @staticmethod
-    def simple(num_qubits):
+    def simple(num_qubits: int) -> 'Circuit':
         """
         Create a simple circuit.
 
@@ -113,8 +121,8 @@ class Circuit:
         circ.base_address = (0, 0)
         return circ
 
-    def __repr__(self):
-        """Class description."""
+    def __repr__(self) -> str:
+        """Return a representation of the object."""
         label_len = len(str(len(self.timepoints)-1))+1
         s = ''
         for i, tp in enumerate(self.timepoints):
@@ -124,20 +132,39 @@ class Circuit:
 
         return s
 
-    def __str__(self):
-        """Class description."""
+    def __str__(self) -> str:
+        """Return a string representation of the object."""
         return self.__repr__()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator:
         """Return iterator for the quantum circuit."""
         for tp in self.timepoints:
             for op in tp:
                 yield op
 
-    def __getitem__(self, ind):
-        """Make circuit subscriptable."""
+    def __getitem__(self,
+                    ind: int) -> Operation:
+        """
+        Make circuit operations subscriptable.
+
+        Parameters
+        ----------
+        ind : int
+            Index of item to get.
+
+        Raises
+        ------
+        IndexError
+            If index out of bounds.
+
+        Returns
+        -------
+        Operation
+            The operation at index ind.
+
+        """
         if ind >= 0:
-            iterator = self.timepoints
+            iterator = self.timepoints.__iter__()
             compare = int.__gt__
             inc = int.__add__
         else:
@@ -149,18 +176,18 @@ class Circuit:
         for tp in iterator:
             L = len(tp)
             if compare(inc(s, L), ind):
-                return tp[ind-s]
+                return tp[ind-s]  # type: ignore
             else:
                 s = inc(s, L)
         else:
             raise IndexError('circuit index out of range')
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Return number of operations in the quantum circuit."""
         return sum([len(tp) for tp in self.timepoints])
 
     @property
-    def cur_time(self):
+    def cur_time(self) -> int:
         """
         Return time at which new operations will begin getting added.
 
@@ -173,16 +200,48 @@ class Circuit:
         return self._cur_time
 
     @cur_time.setter
-    def cur_time(self, new_time):
+    def cur_time(self,
+                 new_time: int) -> None:
+        """
+        Set the current time in the circuit.
+
+        Parameters
+        ----------
+        new_time : int
+            The time to set.
+
+        """
         self._cur_time = new_time
         while self._cur_time >= len(self.timepoints):
             self._append_tp(Timepoint())
 
-    def _standardize_addresses(self, addresses):
+    def _standardize_addresses(self,
+                               addresses: Union[tuple, list[tuple]]
+                               ) -> Union[tuple, list[tuple]]:
+        """
+        Standardize input addresses with respect to base_address.
 
+        All addresses must be targetted at the same level.
+
+        Parameters
+        ----------
+        addresses : tuple or list[tuple]
+            The addresses to standardize.
+
+        Raises
+        ------
+        Exception
+            If any address does not target a qubit.
+
+        Returns
+        -------
+        tuple or list[tuple]
+            Standardized address or list of standardized addresses.
+
+        """
         if type(addresses) is not list:
             not_list = True
-            addresses = [addresses]
+            addresses = [addresses]  # type: ignore
         else:
             not_list = False
 
@@ -213,15 +272,36 @@ class Circuit:
         else:
             return standardized_addresses
 
-    def _apply_encoded_operation(self, op, time=None):
-        crt = self.register[op.targets[0]].constituent_register
-        target_register = self.register[crt]
-        circ = target_register.code.logical_circuits[op.name]
+    def _apply_encoded_operation(self,
+                                 op: Operation,
+                                 time: Optional[Union[int, list[int]]] = None
+                                 ) -> None:
+        """
+        Apply encoded operation to circuit at level > 0.
+
+        Parameters
+        ----------
+        op : Operation
+            Operation to apply.
+        time : int, optional
+            Time at which to apply the Operation. The default is None, in which
+            case the operation is appened via the default strategy.
+
+        Raises
+        ------
+        Exception
+            If the target register does not have a code attached.
+
+        """
+        crt = self.register[op.targets[0]].constituent_register  # type: ignore
+        target_register = self.register[crt]  # type: ignore
+        circ = target_register.code.logical_circuits[op.name]  # type: ignore
         if circ is None:
             raise Exception(f'No logical circuit for {op.name}')
 
         if op.is_controlled:
-            crc = self.register[op.controls[0]].constituent_register
+            crc = self.register[
+                op.controls[0]].constituent_register  # type: ignore
 
         if not op.is_controlled:
             for circ_op in circ:
@@ -240,25 +320,25 @@ class Circuit:
                     op.name, crc+circ_op.controls[0][2:],
                     crt+circ_op.targets[0][2:], time=time)
 
-    def append(self, *args, time=None):
+    def append(self,
+               *args: Any,
+               time: Optional[Union[int, list[int]]] = None) -> None:
         """
         Append a new operation to the circuit.
 
         Parameters
         ----------
-        *args : TYPE
-            DESCRIPTION.
-        time : TYPE, optional
-            DESCRIPTION. The default is None.
+        name : str
+            Name of operation.
+        controls and target : int or tuple
+            The address of any control or target qubits.
+        time : int or [1], optional
+            The time at which to append the operation. The default is None.
 
         Raises
         ------
         Exception
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
+            If Operation not valid, or cannot be appened.
 
         """
         # construct the operation if needed
@@ -270,7 +350,7 @@ class Circuit:
                 pass
             elif len(args) == 2 and name in _one_qubit_operations:
                 target = self._standardize_addresses(args[1])
-                op = Operation(name, [target])
+                op = Operation(name, [target])  # type: ignore
             elif len(args) == 3 and name in _two_qubit_operations:
                 [control, target] = self._standardize_addresses([args[1],
                                                                  args[2]])
@@ -313,16 +393,28 @@ class Circuit:
         else:
             self._apply_encoded_operation(op, time=time)
 
-    def _append_tp(self, tp):
+    def _append_tp(self,
+                   tp: Timepoint) -> None:
+        """
+        Append Timepoint to circuit.
+
+        Parameters
+        ----------
+        tp : Timepoint
+            Timepoint to be appended.
+
+        """
         self.timepoints.append(tp.copy())
 
-    def append_register(self, register):
+    def append_register(self,
+                        register: Register
+                        ) -> tuple:
         """
         Append a register to the circuit.
 
         Parameters
         ----------
-        register : Register or its subclass
+        register : Register
             The register to be appended into the circuit. register.level should
             be set.
 
@@ -333,6 +425,7 @@ class Circuit:
 
         """
         level = register.level
+        assert level is not None
         for i in range(len(self.register), level+1):
             self.register.append(RegisterRegister(f'level{i}', -1))
 
@@ -341,7 +434,9 @@ class Circuit:
 
         return (register.level, register.index)
 
-    def map_to_physical_layout(self, layout='linear'):
+    def map_to_physical_layout(self,
+                               layout: Optional[str] = 'linear'
+                               ) -> list[list]:
         """
         Map the virtual qubits to physical qubits.
 
@@ -361,7 +456,7 @@ class Circuit:
         self.physical_register = Register()
 
         # x = list(range(self.num_qubits))
-        self.physical_register.elements = [PhysicalQubit(i, i, None)
+        self.physical_register.elements = [PhysicalQubit(i, i, [])
                                            for i in range(self.num_qubits)]
 
         qa = self.register[0].qubit_addresses()
@@ -373,7 +468,26 @@ class Circuit:
 
         return self._layout_map
 
-    def _structure(self, depth=-1, levels=None):
+    def _structure(self,
+                   depth: int = -1,
+                   levels: Optional[Union[int, list]] = None
+                   ) -> None:
+        """
+        Print register structure.
+
+        Parameters
+        ----------
+        depth : int, optional
+            The maximum depth to go to. The default is -1.
+        levels : Optional[Union[int, list]], optional
+            The levels of the circuit to display. The default is None.
+
+        Raises
+        ------
+        TypeError
+            If levels not correctly specfied.
+
+        """
         if levels is None:
             for reg in self.register:
                 reg.structure(depth)
@@ -387,11 +501,23 @@ class Circuit:
             raise TypeError('levels must be int or a list')
 
     @ property
-    def num_qubits(self):
-        """TODO: Allow qubits at any level."""
+    def num_qubits(self) -> int:
+        """
+        Determine number of qubits in circuit at level 0.
+
+        Returns
+        -------
+        int
+            Number of qubits.
+
+        """
         return self.register[0].num_qubits
 
-    def apply_circuit(self, other, new_base, time=None):
+    def apply_circuit(self,
+                      other: 'Circuit',
+                      new_base: tuple,
+                      time: Optional[Union[int, list[int]]] = None
+                      ) -> None:
         """
         Apply other circuit to this circuit with a new base.
 
@@ -408,13 +534,9 @@ class Circuit:
         Raises
         ------
         Exception
-            DESCRIPTION.
+            Invalid time point.
         KeyError
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
+            Cannot add circuits.
 
         """
         # qa = other.register.qubit_addresses()
@@ -452,22 +574,40 @@ class Circuit:
                 else:
                     self._append_tp(tp)
 
-    def start_repeat(self, repetitions):
+    def start_repeat(self,
+                     repetitions: int) -> None:
+        """
+        Start a repeat block with a new Timepoint.
+
+        Parameters
+        ----------
+        repetitions : int
+            The number of repetitions of the block.
+
+        """
         self._append_tp(Timepoint())
         self.timepoints[-1].repeat_start = True
         self.timepoints[-1].repeat_repetitions = repetitions
 
-    def end_repeat(self):
+    def end_repeat(self) -> None:
+        """Turn last Timepoint as end of repeat block."""
         self.timepoints[-1].repeat_end = True
 
-    def __add__(self, other):
+    def __add__(self,
+                other: 'Circuit'
+                ) -> 'Circuit':
         """
-        Compose two circuits.
+        Add other circuit to this. Registers must match.
 
         Parameters
         ----------
         other : Circuit
             The circuit to be added to this one.
+
+        Raises
+        ------
+        Exception:
+            If registers are not compatible.
 
         Returns
         -------
@@ -491,22 +631,32 @@ class Circuit:
                                     + other.custom_gates)
         return new_circuit
 
-    def __mul__(self, value):
+    def __mul__(self,
+                repetitions: int) -> 'Circuit':
+        """
+        Create a circuit which repeates repetitions times.
 
+        Parameters
+        ----------
+        repetitions : int
+            The number of repetitions.
+
+        Returns
+        -------
+        new_circuit : Circuit
+            The repeated circuit.
+
+        """
         new_circuit = copy.deepcopy(self)
 
-        for i in range(value-1):
-            for tp in self.timepoints:
-                for op in tp:
-                    new_circuit.append(op)
+        new_circuit.timepoints[0].repeat_start = True
+        new_circuit.timepoints[0].repeat_repetitions = repetitions
 
-            new_circuit._append_tp(Timepoint())
-
-        new_circuit.timepoints.pop()
+        new_circuit.timepoints[-1].repeat_end = True
 
         return new_circuit
 
-    def qasm(self):
+    def qasm(self) -> str:
         """
         Convert circuit to qasm string.
 
@@ -552,7 +702,7 @@ class Circuit:
 
         return qasm_str
 
-    def stim(self):
+    def stim(self) -> str:
         """
         Convert circuit to a string that can be imported by stim.
 
@@ -585,7 +735,7 @@ class Circuit:
 
         return stim_str
 
-    def quirk(self):
+    def quirk(self) -> None:
         """
         Convert circuit to a quirk circuit.
 
@@ -619,10 +769,11 @@ class Circuit:
         print(url)
 
     def simulate(self,
-                 head=None,
-                 incremental=False,
-                 return_state=False,
-                 print_state=True):
+                 head: Optional[list[str]] = None,
+                 incremental: bool = False,
+                 return_state: bool = False,
+                 print_state: bool = True
+                 ) -> list[Any]:
         """
         Simulate the circuit using qiskit.
 
@@ -676,8 +827,9 @@ class Circuit:
             return tab
 
     def sample(self,
-               return_sample=False,
-               print_sample=True):
+               return_sample: bool = False,
+               print_sample: bool = True
+               ) -> list[int]:
         """
         Return a sample from the circuit using stim.
 
@@ -690,8 +842,8 @@ class Circuit:
 
         Returns
         -------
-        TYPE
-            DESCRIPTION.
+        list
+            The sample from the stim circuit.
 
         """
         stim_circ = stim.Circuit(self.stim())
@@ -703,7 +855,9 @@ class Circuit:
         if return_sample:
             return 1*sample
 
-    def draw(self, filename=None):
+    def draw(self,
+             filename: str = None
+             ) -> None:
         """
         Draw a text version of the circuit.
 
@@ -822,7 +976,9 @@ class Circuit:
             print(''.join(line1), file=file)
             print(''.join(line2), file=file, flush=True)
 
-    def _draw_large(self, filename):
+    def _draw_large(self,
+                    filename: str
+                    ) -> None:
         """
         Draw a text version of the circuit.
 

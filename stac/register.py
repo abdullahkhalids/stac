@@ -60,14 +60,14 @@ class Register:
         return self.elements.__iter__()
 
     def __getitem__(self,
-                    s: Union[int, tuple[int]]
+                    s: Union[int, tuple]
                     ) -> Union['Register', VirtualQubit]:
         """
         Make Register subscriptable.
 
         Parameters
         ----------
-        s : Union[int, tuple[int]]
+        s : Union[int, tuple]
             Address of register to return.
 
         Returns
@@ -203,7 +203,7 @@ subregister or qubit at {s}.'
         print(determine_structure(self, 0, 0))
 
     def check_address(self,
-                      address: tuple[int]) -> bool:
+                      address: tuple) -> bool:
         """
         Determine if address is a valid qubit address in this Register.
 
@@ -223,7 +223,7 @@ subregister or qubit at {s}.'
             Only returns True if valid address, else raises Exception.
 
         """
-        truncated_address: tuple[int] = address[:-1]  # type: ignore
+        truncated_address: tuple = address[:-1]  # type: ignore
         try:
             self[truncated_address]
         except KeyError:
