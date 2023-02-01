@@ -1,7 +1,6 @@
 """Provides a set of classes to define registers of qubits."""
 from typing import Union, Optional, Iterator, Any, Sequence
 from .qubit import VirtualQubit
-from .code import Code
 
 
 class Register:
@@ -383,7 +382,7 @@ class RegisterRegister(Register):
                  level: int,
                  subregisters: Optional[Iterator[Union[Register,
                                                        VirtualQubit]]] = None,
-                 code: Optional[Code] = None) -> None:
+                 code: Optional['Code'] = None) -> None:
         """
         Construct a register to hold registers.
 
