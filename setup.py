@@ -20,5 +20,6 @@ setup(
                       "numpy",
                       "qiskit",
                       "stim",
-                      "tabulate"]
+                      "tabulate",
+                      "svg.py"]
 )

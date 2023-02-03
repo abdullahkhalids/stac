@@ -10,7 +10,7 @@ from .supportedoperations import _zero_qubit_operations,\
 import textwrap
 import sys
 
-
+import svg
 import json
 import numpy as np
 from qiskit import QuantumCircuit, execute, Aer
@@ -18,6 +18,7 @@ import stim
 import copy
 import tabulate
 tabulate.PRESERVE_WHITESPACE = True
+from IPython.display import display, SVG
 
 
 def display_states(head,
@@ -856,8 +857,35 @@ class Circuit:
             return 1*sample
 
     def draw(self,
-             filename: str = None
+             medium: str = 'svg',
+             filename: str = None,
+             *,
+             highlight_timepoints: Optional[bool] = False
              ) -> None:
+        """
+        Draw the circuit.
+
+        Parameters
+        ----------
+        medium: str, optional
+            Options are 'svg' or 'text'. Default is 'svg'.
+        filename : str, optional
+            If filename is provided, then the output will be written to the
+            file. Otherwise, it will be displayed. The default is None.
+        highlight_timepoints: bool, optional
+            Only for medium='svg'. If True, each timepoint is highlighted.
+            Default is False.
+
+        """
+        if medium == 'svg':
+            self._draw_svg(filename,
+                           highlight_timepoints)
+        elif medium == 'text':
+            self._draw_text(filename)
+
+    def _draw_text(self,
+                   filename: Optional[str] = None,
+                   ) -> None:
         """
         Draw a text version of the circuit.
 
@@ -866,10 +894,6 @@ class Circuit:
         filename : str, optional
             If filename is provided, then the output will be written to the
             file. Otherwise, it will be printed out. The default is None.
-
-        Returns
-        -------
-        None.
 
         """
         dash = '─'
@@ -976,128 +1000,149 @@ class Circuit:
             print(''.join(line1), file=file)
             print(''.join(line2), file=file, flush=True)
 
-    def _draw_large(self,
-                    filename: str
-                    ) -> None:
+    def _draw_svg(self,
+                  filename: Optional[str] = None,
+                  highlight_timepoints=False
+                  ) -> None:
         """
-        Draw a text version of the circuit.
+        Draw a svg version of the circuit.
 
         Parameters
         ----------
-        filename : str, optional
+        filename : Optional[str], optional
             If filename is provided, then the output will be written to the
             file. Otherwise, it will be printed out. The default is None.
-
-        Returns
-        -------
-        None.
+        highlight_timepoints : TYPE, optional
+            If True, each timepoint is highlighted. The default is False.
 
         """
-        dash = '─'
-        space = ' '
-        vert = '│'
-        folder = 'circfiles/'
-
         if not self._layout_map:
             self.map_to_physical_layout()
+
+        T = 30
+        el = []
+        wirey = [20 + i*40 for i in range(self.num_qubits)]
 
         num_qubits = self.num_qubits
         lm = self._layout_map.copy()
         lm.sort(key=lambda x: x[1])
         address_label_len = max(map(len, map(lambda x: str(x[0]), lm)))
         index_label_len = 3 + len(str(num_qubits))
-        label_len = address_label_len + index_label_len
-        circ_disp = [list(str(lm[i][0]).ljust(address_label_len)
-                          + (' : ' + str(lm[i][1])).rjust(index_label_len)
-                     + space) for i in range(num_qubits)]
-        circ_disp2 = [list(space*(label_len+1))
-                      for _ in range(num_qubits)]
+        labels = [str(lm[i][0]).ljust(address_label_len)
+                  + (' : ' + str(lm[i][1])).rjust(index_label_len)
+                  for i in range(num_qubits)]
+        x0 = max(map(len, labels))*7.5
+        for i in range(num_qubits):
+            el.append(svg.Text(x=0, y=wirey[i]+7.75,
+                               text=labels[i],
+                               class_=["labeltext"]))
 
-        with open(folder + 'a', 'w') as file:
-            for line1, line2 in zip(circ_disp, circ_disp2):
-                print(''.join(line1), file=file)
-                print(''.join(line2), file=file, flush=True)
-
-        circ_tp_line = [space*(label_len+1)]
-
-        for tp_i, tp in enumerate(self.timepoints):
-            circ_disp = [[] for i in range(num_qubits)]
-            circ_disp2 = [[] for i in range(num_qubits)]
+        time = 0
+        recs = []
+        highlight_class = "tp_highlight1"
+        for tp in self.timepoints:
+            highlight_class = "tp_highlight1" \
+                if highlight_class == "tp_highlight2" else "tp_highlight2"
+            start_time = time
 
             slices = [[]]
-            slices_touched_qubits = [[]]
-            for op_id, op in enumerate(tp.operations):
+            slices_touched_qubits = [set()]
+            for op in tp.operations:
 
                 t = self.register[op.targets[0]].constituent_register.index
 
                 if not op.is_controlled:
-                    touched_by_op = [t]
+                    touched_by_op = set([t])
                 else:
                     c = self.register[op.controls[0]
                                       ].constituent_register.index
-                    touched_by_op = list(range(c, t))\
-                        + list(range(t, c))
-                    touched_by_op.append(touched_by_op[-1]+1)
+                    touched_by_op = set(list(range(c, t))
+                                        + list(range(t, c)))
 
                 for s in range(len(slices)):
-                    if len(
-                            set(touched_by_op).intersection(
-                                set(slices_touched_qubits[s]))) == 0:
+                    if touched_by_op.isdisjoint(slices_touched_qubits[s]):
                         slices[s].append(op)
-                        slices_touched_qubits[s] += touched_by_op
+                        slices_touched_qubits[s].update(touched_by_op)
                         break
                 else:
                     slices.append([op])
                     slices_touched_qubits.append(touched_by_op)
 
-            circ_tp_line.append('⍿' + space*(3*(len(slices)-1)+2))
-
             for sl in slices:
-                touched_places = []
 
                 for op in sl:
                     t = self.register[op.targets[0]].constituent_register.index
 
                     if not op.is_controlled:
-                        s = dash + op.draw_str_target + dash
-                        circ_disp[t].append(s)
-                        circ_disp2[t].append(space*3)
-                        touched_places.append(t)
+
+                        el += [
+                            svg.Rect(
+                                x=x0+time*T+7, y=wirey[t]-10,
+                                width=20, height=20,
+                                class_=["gaterect"]
+                            ),
+                            svg.Text(
+                                x=x0+time*T+10, y=wirey[t] + 7.75,
+                                text=op.name[-1],
+                                class_=["gatetext"]
+                            )]
 
                     elif op.is_controlled:
                         c = self.register[op.controls[0]
                                           ].constituent_register.index
-                        vert_places = list(range(c, t)) + list(range(t, c))
-                        for i in range(num_qubits):
-                            if i == c:
-                                circ_disp[i].append(
-                                    dash + op.draw_str_control + dash)
-                                if i == vert_places[0]:
-                                    circ_disp2[i].append(space + vert + space)
-                                else:
-                                    circ_disp2[i].append(space*3)
-                                touched_places.append(i)
-                            elif i == t:
-                                circ_disp[i].append(
-                                    dash + op.draw_str_target + dash)
-                                if i == vert_places[0]:
-                                    circ_disp2[i].append(space + vert + space)
-                                else:
-                                    circ_disp2[i].append(space*3)
-                                touched_places.append(i)
-                            elif i in vert_places[1:]:
-                                circ_disp[i].append(dash + '┼' + dash)
-                                circ_disp2[i].append(space + vert + space)
-                                touched_places.append(i)
 
-                for i in range(num_qubits):
-                    if i not in set(touched_places):
-                        circ_disp[i].append(dash*3)
-                        circ_disp2[i].append(space*3)
+                        el += [
+                            svg.Circle(
+                                cx=x0+time*T+17, cy=wirey[c], r=3,
+                                class_=["control1"]
+                            ),
+                            svg.Line(
+                                x1=x0+time*T+17, x2=x0+time*T+17,
+                                y1=wirey[c]+3, y2=wirey[t]-10,
+                                class_=["controlline"]
+                            ),
+                            svg.Rect(
+                                x=x0+time*T+7, y=wirey[t]-10,
+                                width=20, height=20,
+                                class_=["gaterect"]
+                            ),
+                            svg.Text(
+                                x=x0+time*T+10, y=wirey[t]+7.75,
+                                text=op.name[-1],
+                                class_=["gatetext"]
+                            )
+                        ]
+                time += 1
+            if highlight_timepoints:
+                recs.append(svg.Rect(
+                    x=x0+start_time*T+2.25, y=0,
+                    width=(time-start_time)*T, height=wirey[-1]+20,
+                    class_=[highlight_class]))
 
-            with open(folder + 'b' + str(tp_i), 'w') as file:
-                for line1, line2 in zip(circ_disp, circ_disp2):
-                    print(''.join(line1), file=file)
-                    print(''.join(line2),
-                          file=file,
-                          flush=True)
+        el = [svg.Style(
+            text="""
+            .labeltext { font: 12px; font-weight: 400; fill: black;}
+            .qubitline { stroke: black; stroke-width: 2; }
+            .gatetext { font: 20px sans-serif; font-weight: 400; fill: black;}
+            .gaterect { fill: white; stroke: black; stroke-width: 2 }
+            .control1 { fill: black; stroke: black; stroke-width: 1 }
+            .controlline { stroke: black; stroke-width: 2}
+            .tp_highlight1 { fill: red; opacity: 0.2;}
+            .tp_highlight2 { fill: blue; opacity: 0.2;}
+                """)] + recs + \
+            [svg.Line(
+                x1=x0+0, x2=x0+time*T+30,
+                y1=y, y2=y,
+                class_=["qubitline"]) for y in wirey] + el
+
+        s = svg.SVG(
+            width=x0+time*T+2.25,
+            height=wirey[-1]+19,
+            elements=el,
+        )
+
+        if filename is None:
+            display(SVG(s.as_str()))
+        else:
+            with open(filename, 'w') as f:
+                f.write(s.as_str())
