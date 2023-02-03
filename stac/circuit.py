@@ -828,6 +828,7 @@ class Circuit:
             return tab
 
     def sample(self,
+               samples=1,
                return_sample: bool = False,
                print_sample: bool = True
                ) -> list[int]:
@@ -848,13 +849,14 @@ class Circuit:
 
         """
         stim_circ = stim.Circuit(self.stim())
-        sample = stim_circ.compile_sampler().sample(1)[0]
+        samples = stim_circ.compile_sampler().sample(samples)
 
         if print_sample:
-            print(*(1*sample), sep="")
+            for s in samples:
+                print(1*s, sep="")
 
         if return_sample:
-            return 1*sample
+            return samples
 
     def draw(self,
              medium: str = 'svg',
@@ -907,15 +909,17 @@ class Circuit:
         lm = self._layout_map.copy()
         lm.sort(key=lambda x: x[1])
         address_label_len = max(map(len, map(lambda x: str(x[0]), lm)))
-        index_label_len = 3 + len(str(num_qubits))
-        label_len = address_label_len + index_label_len
-        circ_disp = [list(str(lm[i][0]).ljust(address_label_len)
-                          + (' : ' + str(lm[i][1])).rjust(index_label_len)
-                     + space) for i in range(num_qubits)]
+        index_label_len = len(str(num_qubits))
+        label_len = address_label_len + index_label_len+3
+        circ_disp = [[str(lm[i][0]).ljust(address_label_len)
+                     + ' : '
+                     + str(lm[i][1]).rjust(index_label_len)
+                     + space]
+                     for i in range(num_qubits)]
         circ_disp2 = [list(space*(label_len+1))
                       for _ in range(num_qubits)]
 
-        circ_tp_line = [space*(label_len+1)]
+        # circ_tp_line = [space*(label_len+1)]
 
         for tp in self.timepoints:
             slices = [[]]
@@ -941,7 +945,7 @@ class Circuit:
                     slices.append([op])
                     slices_touched_qubits.append(touched_by_op)
 
-            circ_tp_line.append('⍿' + space*(3*(len(slices)-1)+2))
+            # circ_tp_line.append('⍿' + space*(3*(len(slices)-1)+2))
 
             for sl in slices:
                 touched_places = []
@@ -991,7 +995,7 @@ class Circuit:
         else:
             file = open(filename, 'w')
 
-        print(''.join(circ_tp_line), file=file, flush=True)
+        # print(''.join(circ_tp_line), file=file, flush=True)
         for line1, line2 in zip(circ_disp, circ_disp2):
             print(''.join(line1), file=file)
             print(''.join(line2), file=file, flush=True)
@@ -1023,11 +1027,15 @@ class Circuit:
         lm = self._layout_map.copy()
         lm.sort(key=lambda x: x[1])
         address_label_len = max(map(len, map(lambda x: str(x[0]), lm)))
-        index_label_len = 3 + len(str(num_qubits))
-        labels = [str(lm[i][0]).ljust(address_label_len)
-                  + (' : ' + str(lm[i][1])).rjust(index_label_len)
+        index_label_len = len(str(num_qubits))
+        nbspace = '&#160;'
+        labels = [str(lm[i][0])
+                  + nbspace*(address_label_len-len(str(lm[i][0]))+1)
+                  + ':'
+                  + nbspace*(index_label_len-len(str(lm[i][1]))+1)
+                  + str(lm[i][1])
                   for i in range(num_qubits)]
-        x0 = max(map(len, labels))*6
+        x0 = max(map(len, labels))*3
         for i in range(num_qubits):
             el.append(svg.Text(x=0, y=wirey[i]+4.5,
                                text=labels[i],
@@ -1117,7 +1125,8 @@ class Circuit:
 
         el = [svg.Style(
             text="""
-            .labeltext { font-size: 12px; font-weight: 400; fill: black;}
+            .labeltext { font-family: Bitstream Vera Sans Mono;
+                        font-size: 12px; font-weight: 400; fill: black; }
             .qubitline { stroke: black; stroke-width: 2; }
             .gatetext { font: 20px sans-serif; font-weight: 400; fill: black;}
             .gaterect { fill: white; stroke: black; stroke-width: 2 }
