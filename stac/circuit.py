@@ -1035,7 +1035,8 @@ class Circuit:
                   + nbspace*(index_label_len-len(str(lm[i][1]))+1)
                   + str(lm[i][1])
                   for i in range(num_qubits)]
-        x0 = max(map(len, labels))*3
+        x0 = (address_label_len+index_label_len+3)*8
+
         for i in range(num_qubits):
             el.append(svg.Text(x=0, y=wirey[i]+4.5,
                                text=labels[i],
