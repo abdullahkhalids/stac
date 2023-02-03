@@ -918,28 +918,24 @@ class Circuit:
         circ_tp_line = [space*(label_len+1)]
 
         for tp in self.timepoints:
-
             slices = [[]]
-            slices_touched_qubits = [[]]
-            for op_id, op in enumerate(tp.operations):
+            slices_touched_qubits = [set()]
+            for op in tp.operations:
 
                 t = self.register[op.targets[0]].constituent_register.index
 
                 if not op.is_controlled:
-                    touched_by_op = [t]
+                    touched_by_op = set([t])
                 else:
                     c = self.register[op.controls[0]
                                       ].constituent_register.index
-                    touched_by_op = list(range(c, t))\
-                        + list(range(t, c))
-                    touched_by_op.append(touched_by_op[-1]+1)
+                    touched_by_op = set(list(range(c, t))
+                                        + list(range(t, c)))
 
                 for s in range(len(slices)):
-                    if len(
-                            set(touched_by_op).intersection(
-                                set(slices_touched_qubits[s]))) == 0:
+                    if touched_by_op.isdisjoint(slices_touched_qubits[s]):
                         slices[s].append(op)
-                        slices_touched_qubits[s] += touched_by_op
+                        slices_touched_qubits[s].update(touched_by_op)
                         break
                 else:
                     slices.append([op])
@@ -1031,9 +1027,9 @@ class Circuit:
         labels = [str(lm[i][0]).ljust(address_label_len)
                   + (' : ' + str(lm[i][1])).rjust(index_label_len)
                   for i in range(num_qubits)]
-        x0 = max(map(len, labels))*7.5
+        x0 = max(map(len, labels))*6
         for i in range(num_qubits):
-            el.append(svg.Text(x=0, y=wirey[i]+7.75,
+            el.append(svg.Text(x=0, y=wirey[i]+4.5,
                                text=labels[i],
                                class_=["labeltext"]))
 
@@ -1121,7 +1117,7 @@ class Circuit:
 
         el = [svg.Style(
             text="""
-            .labeltext { font: 12px; font-weight: 400; fill: black;}
+            .labeltext { font-size: 12px; font-weight: 400; fill: black;}
             .qubitline { stroke: black; stroke-width: 2; }
             .gatetext { font: 20px sans-serif; font-weight: 400; fill: black;}
             .gaterect { fill: white; stroke: black; stroke-width: 2 }
