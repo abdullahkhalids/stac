@@ -9,6 +9,10 @@ class Operation:
                                   'CY': 'Y',
                                   'CZ': '●',
                                   'MR': 'm'}
+    
+    _draw_img_target_dic: dict = {'CX': 'X',
+                                  'CY': 'Y',
+                                  'CZ': 'Z',}
 
     def __init__(self,
                  name: str,

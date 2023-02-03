@@ -1,4 +1,5 @@
 """Provide a module to create and manipulate quantum circuits."""
+from IPython.display import display, SVG
 from typing import Any, Iterator, Union, Optional, Callable
 from .operation import Operation
 from .timepoint import Timepoint
@@ -18,7 +19,6 @@ import stim
 import copy
 import tabulate
 tabulate.PRESERVE_WHITESPACE = True
-from IPython.display import display, SVG
 
 
 def display_states(head,
@@ -1019,9 +1019,15 @@ class Circuit:
         if not self._layout_map:
             self.map_to_physical_layout()
 
-        T = 30
+        y_shift = 20
+        bxs = 8
+        bh = 26
+        bys = -bh/2
+        ly1s = 3
+        ly2s = -bh/2
+
         el = []
-        wirey = [20 + i*40 for i in range(self.num_qubits)]
+        wirey = [y_shift + i*46 for i in range(self.num_qubits)]
 
         num_qubits = self.num_qubits
         lm = self._layout_map.copy()
@@ -1037,18 +1043,23 @@ class Circuit:
                   for i in range(num_qubits)]
         x0 = (address_label_len+index_label_len+3)*8
 
+        # add labels
         for i in range(num_qubits):
-            el.append(svg.Text(x=0, y=wirey[i]+4.5,
+            el.append(svg.Text(x=0, y=wirey[i],
                                text=labels[i],
-                               class_=["labeltext"]))
+                               class_=["labeltext"],
+                               dominant_baseline='central'
+                               ))
 
         time = 0
+        max_width = 0
+        slice_x = x0
         recs = []
         highlight_class = "tp_highlight1"
         for tp in self.timepoints:
             highlight_class = "tp_highlight1" \
                 if highlight_class == "tp_highlight2" else "tp_highlight2"
-            start_time = time
+            start_time = slice_x
 
             slices = [[]]
             slices_touched_qubits = [set()]
@@ -1079,57 +1090,68 @@ class Circuit:
                     t = self.register[op.targets[0]].constituent_register.index
 
                     if not op.is_controlled:
-
+                        width = len(op.name)*18+10
                         el += [
                             svg.Rect(
-                                x=x0+time*T+7, y=wirey[t]-10,
-                                width=20, height=20,
-                                class_=["gaterect"]
-                            ),
+                                x=slice_x+bxs, y=wirey[t]+bys,
+                                width=width, height=bh,
+                                class_=["gaterect"],
+                                ),
                             svg.Text(
-                                x=x0+time*T+10, y=wirey[t] + 7.75,
-                                text=op.name[-1],
-                                class_=["gatetext"]
+                                x=slice_x+bxs+width/2, y=wirey[t]+bys+bh/2,
+                                text=op.name,
+                                class_=["gatetext"],
+                                text_anchor='middle',
+                                dominant_baseline='central'
                             )]
 
                     elif op.is_controlled:
                         c = self.register[op.controls[0]
                                           ].constituent_register.index
 
+                        name_label = op._draw_img_target_dic.get(op.name,
+                                                                 op.name[-1])
+                        width = len(name_label)*16 + 12
+
                         el += [
                             svg.Circle(
-                                cx=x0+time*T+17, cy=wirey[c], r=3,
+                                cx=slice_x+bxs+width/2, cy=wirey[c], r=3,
                                 class_=["control1"]
                             ),
                             svg.Line(
-                                x1=x0+time*T+17, x2=x0+time*T+17,
-                                y1=wirey[c]+3, y2=wirey[t]-10,
+                                x1=slice_x+bxs+width/2, x2=slice_x+bxs+width/2,
+                                y1=wirey[c]+ly1s, y2=wirey[t]+ly2s,
                                 class_=["controlline"]
                             ),
                             svg.Rect(
-                                x=x0+time*T+7, y=wirey[t]-10,
-                                width=20, height=20,
+                                x=slice_x+bxs, y=wirey[t]+bys,
+                                width=width, height=bh,
                                 class_=["gaterect"]
                             ),
                             svg.Text(
-                                x=x0+time*T+10, y=wirey[t]+7.75,
-                                text=op.name[-1],
-                                class_=["gatetext"]
+                                x=slice_x+bxs+width/2, y=wirey[t]+bys+bh/2,
+                                text=name_label,
+                                class_=["gatetext"],
+                                text_anchor='middle',
+                                dominant_baseline='central'
                             )
                         ]
+                    max_width = max(max_width, width)
                 time += 1
+                slice_x += max_width+bxs
             if highlight_timepoints:
                 recs.append(svg.Rect(
-                    x=x0+start_time*T+2.25, y=0,
-                    width=(time-start_time)*T, height=wirey[-1]+20,
+                    x=start_time+bxs/2, y=0,
+                    width=slice_x-start_time, height=wirey[-1]+y_shift,
                     class_=[highlight_class]))
 
         el = [svg.Style(
             text="""
             .labeltext { font-family: Bitstream Vera Sans Mono;
-                        font-size: 12px; font-weight: 400; fill: black; }
+                        font-size: 12px; font-weight: 400; fill: black;}
             .qubitline { stroke: black; stroke-width: 2; }
-            .gatetext { font: 20px sans-serif; font-weight: 400; fill: black;}
+            .gatetext { font-family: Latin Modern Math, Cambria Math;
+                       font-size: 20px; font-weight: 400; fill: black;}
             .gaterect { fill: white; stroke: black; stroke-width: 2 }
             .control1 { fill: black; stroke: black; stroke-width: 1 }
             .controlline { stroke: black; stroke-width: 2}
@@ -1137,13 +1159,13 @@ class Circuit:
             .tp_highlight2 { fill: blue; opacity: 0.2;}
                 """)] + recs + \
             [svg.Line(
-                x1=x0+0, x2=x0+time*T+30,
+                x1=x0+0, x2=slice_x+bxs,
                 y1=y, y2=y,
                 class_=["qubitline"]) for y in wirey] + el
 
         s = svg.SVG(
-            width=x0+time*T+2.25,
-            height=wirey[-1]+19,
+            width=slice_x+bxs,
+            height=wirey[-1]+bh,
             elements=el,
         )
 
