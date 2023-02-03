@@ -7,7 +7,7 @@ with open("README.md", "r") as f:
 
 setup(
     name="stac",
-    version="0.1",
+    version="0.2",
     author="Abdullah Khalid",
     author_email="abdullah@abdullahkhalid.com",
     description="A python library to play with stabilizer codes.",
@@ -20,5 +20,6 @@ setup(
                       "numpy",
                       "qiskit",
                       "stim",
-                      "tabulate"]
+                      "tabulate",
+                      "svg.py"]
 )
