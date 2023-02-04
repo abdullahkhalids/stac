@@ -678,6 +678,8 @@ class Circuit:
             The qasm string of the circuit.
 
         """
+        if not self._layout_map:
+            self.map_to_physical_layout()
         qasm_str = ''
 
         for op in self:
