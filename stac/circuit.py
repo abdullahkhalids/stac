@@ -1,6 +1,6 @@
 """Provide a module to create and manipulate quantum circuits."""
 from IPython.display import display, SVG
-from typing import Any, Iterator, Union, Optional, Callable
+from typing import Any, Iterator, Union, Optional
 from .operation import Operation
 from .timepoint import Timepoint
 from .qubit import PhysicalQubit  # , VirtualQubit
@@ -186,6 +186,17 @@ class Circuit:
     def __len__(self) -> int:
         """Return number of operations in the quantum circuit."""
         return sum([len(tp) for tp in self.timepoints])
+
+    def reverse(self) -> 'Circuit':
+        """Return a circuit in which all operations are reversed."""
+        rev_circuit = Circuit()
+        rev_circuit.register = self.register.copy()
+        for tp in reversed(self.timepoints):
+            rev_circuit._append_tp(Timepoint())
+            for op in reversed(tp.operations):
+                rev_circuit.append(op, time=-1)
+
+        return rev_circuit
 
     @property
     def cur_time(self) -> int:
@@ -1096,7 +1107,7 @@ class Circuit:
                                 x=slice_x+bxs, y=wirey[t]+bys,
                                 width=width, height=bh,
                                 class_=["gaterect"],
-                                ),
+                            ),
                             svg.Text(
                                 x=slice_x+bxs+width/2, y=wirey[t]+bys+bh/2,
                                 text=op.name,

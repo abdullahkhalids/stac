@@ -35,6 +35,24 @@ class Register:
 
         self.level: Union[int, None] = None
 
+    def copy(self) -> 'Register':
+        """
+        Create a copy of this register.
+
+        Returns
+        -------
+        Register
+            The copy of this register.
+
+        """
+        reg = Register.__new__(Register)
+        reg.index = self.index
+        reg.register_type = self.register_type
+        reg.elements = [r.copy() for r in self.elements]
+        reg.level = self.level
+
+        return reg
+
     def __repr__(self) -> str:
         """Return a representation of the object."""
         if type(self) is QubitRegister:
@@ -341,6 +359,24 @@ class QubitRegister(Register):
 
         self.index = index
 
+    def copy(self) -> 'QubitRegister':
+        """
+        Create a copy of this register.
+
+        Returns
+        -------
+        QubitRegister
+            A copy of this register.
+
+        """
+        reg = QubitRegister.__new__(QubitRegister)
+        reg.register_type = self.register_type
+        reg.level = self.level
+        reg.elements = [q.copy() for q in self.elements]
+        reg.index = self.index
+
+        return reg
+
     @ property  # type: ignore
     def index(self) -> Union[int, None]:
         """
@@ -382,7 +418,7 @@ class RegisterRegister(Register):
                  level: int,
                  subregisters: Optional[Iterator[Union[Register,
                                                        VirtualQubit]]] = None,
-                 code: Optional['Code'] = None) -> None:
+                 code: Optional[Any] = None) -> None:
         """
         Construct a register to hold registers.
 
@@ -414,6 +450,26 @@ class RegisterRegister(Register):
         self.code = code
 
         self._index: Union[int, None] = None
+
+    def copy(self) -> 'RegisterRegister':
+        """
+        Create a copy of this register.
+
+        Returns
+        -------
+        RegisterRegister
+            The copied register.
+
+        """
+        reg = RegisterRegister.__new__(RegisterRegister)
+
+        reg.register_type = self.register_type
+        reg.level = self.level
+        reg.elements = [r.copy() for r in self.elements]
+        reg.code = self.code
+        reg._index = self._index
+
+        return reg
 
     @ property  # type: ignore
     def index(self) -> Optional[int]:

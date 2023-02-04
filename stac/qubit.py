@@ -122,3 +122,26 @@ class VirtualQubit:
 
         """
         self._index = value
+
+    def copy(self) -> 'VirtualQubit':
+        """
+        Create copy of this register.
+
+        Returns
+        -------
+        VirtualQubit
+            The copy of self.
+
+        """
+        vq = VirtualQubit.__new__(VirtualQubit)
+        vq.level = self.level
+
+        vq.assigned_register = self.assigned_register
+        vq.index = self.index_in_assigned_register
+
+        vq.constituent_register = self.constituent_register
+        vq.index_in_constituent_register = self.index_in_constituent_register
+
+        vq.register_type = 'q'
+
+        return vq
