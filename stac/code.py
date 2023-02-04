@@ -557,6 +557,26 @@ class Code:
         self.destab_gen_mat = np.array(destabs)
         return self.destab_gen_mat
 
+    def construct_data_register(
+            self,
+            level: int
+            ) -> RegisterRegister:
+        """
+        Create a data qubit register for this code.
+
+        Parameters
+        ----------
+        level : int
+            The concatenation level of the qubit.
+
+        Returns
+        -------
+        RegisterRegister
+            The data qubit register.
+
+        """
+        return QubitRegister('d', level, self.num_physical_qubits)
+
     def construct_syndrome_measurement_register(
             self,
             level: int,
@@ -649,9 +669,24 @@ class Code:
                                 subregisters=(datareg, syndreg),
                                 code=self)
 
-    def construct_encoding_circuit(self) -> Circuit:
+    def construct_encoding_circuit(self,
+                                   syndrome_measurement_type: str = 'none'
+                                   ) -> Circuit:
         """
         Construct an encoding circuit for the code using Gottesman's method.
+
+        Parameters
+        ----------
+        syndrome_measurement_type : str, optional
+            Possible types are
+                * 'none': Creates a simple data register only. Default.
+                * 'non_ft',
+                * 'cat',
+                * 'cat_standard'.
+                With the 'standard' postfix uses the standard form of the
+                generators.
+            The syndrome registers will be empty, but useful if the circuit
+            is part of a larget circuit.
 
         Returns
         -------
@@ -667,9 +702,16 @@ class Code:
         r = self.rankx
 
         self.encoding_circuit = Circuit()
-        self.encoding_circuit.append_register(
-            self.construct_encoded_qubit_register(0, 'non_ft'))
-        self.encoding_circuit.base_address = (0, 0, 0)
+        if syndrome_measurement_type == 'none':
+            reg = self.construct_data_register(0)
+            self.encoding_circuit.base_address = (0, 0)
+        else:
+            reg = self.construct_encoded_qubit_register(
+                0,
+                syndrome_measurement_type)
+            self.encoding_circuit.base_address = (0, 0, 0)
+
+        self.encoding_circuit.append_register(reg)
         for i in range(k):
             for j in range(r, n-k):
                 if self.logical_xs[i, j]:
