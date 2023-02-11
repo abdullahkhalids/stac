@@ -1,12 +1,12 @@
 """Provide a module to create and manipulate quantum circuits."""
 from IPython.display import display, SVG
-from typing import Any, Iterator, Union, Optional
+from typing import Any, Iterator, Union, Optional, overload
 from .operation import Operation
 from .timepoint import Timepoint
 from .qubit import PhysicalQubit  # , VirtualQubit
 from .register import Register, QubitRegister, RegisterRegister
 from .supportedoperations import _zero_qubit_operations,\
-    _one_qubit_operations, _two_qubit_operations
+    _one_qubit_operations, _two_qubit_operations, _operations
 
 import textwrap
 import sys
@@ -228,8 +228,8 @@ class Circuit:
             self._append_tp(Timepoint())
 
     def _standardize_addresses(self,
-                               addresses: Union[tuple, list[tuple]]
-                               ) -> Union[tuple, list[tuple]]:
+                               addresses: list[tuple]
+                               ) -> list[tuple]:
         """
         Standardize input addresses with respect to base_address.
 
@@ -237,7 +237,7 @@ class Circuit:
 
         Parameters
         ----------
-        addresses : tuple or list[tuple]
+        addresses : list[tuple]
             The addresses to standardize.
 
         Raises
@@ -251,12 +251,6 @@ class Circuit:
             Standardized address or list of standardized addresses.
 
         """
-        if type(addresses) is not list:
-            not_list = True
-            addresses = [addresses]  # type: ignore
-        else:
-            not_list = False
-
         standardized_addresses = []
         if self.base_address:
             level = self.base_address[0]
@@ -279,10 +273,7 @@ class Circuit:
         if len(set(standardized_addresses)) != len(standardized_addresses):
             raise Exception('Some addresses were repeated')
 
-        if not_list:
-            return standardized_addresses[0]
-        else:
-            return standardized_addresses
+        return standardized_addresses
 
     def _apply_encoded_operation(self,
                                  op: Operation,
@@ -305,36 +296,67 @@ class Circuit:
             If the target register does not have a code attached.
 
         """
-        crt = self.register[op.targets[0]].constituent_register  # type: ignore
-        target_register = self.register[crt]  # type: ignore
-        circ = target_register.code.logical_circuits[op.name]  # type: ignore
+        t0 = self.register[op.targets[0]].constituent_register
+        target_register = self.register[t0]
+        circ = target_register.code.logical_circuits[op.name]
         if circ is None:
             raise Exception(f'No logical circuit for {op.name}')
 
-        if op.is_controlled:
-            crc = self.register[
-                op.controls[0]].constituent_register  # type: ignore
-
-        if not op.is_controlled:
+        if op.num_affected_qubits == 1:
             for circ_op in circ:
-                if not circ_op.is_controlled:
+                if not circ_op.num_affected_qubits == 1:
                     self.append(circ_op.name,
-                                crt+circ_op.targets[0][2:],
+                                t0+circ_op.targets[0][2:],
                                 time=time)
                 else:
                     self.append(circ_op.name,
-                                crt+circ_op.controls[0][2:],
-                                crt+circ_op.targets[0][2:],
+                                t0+circ_op.targets[0][2:],
+                                t0+circ_op.targets[1][2:],
                                 time=time)
         else:
+            t1 = self.register[op.targets[1]].constituent_register
+            # what if circ_op is a one qubit operation
             for circ_op in circ:
                 self.append(
-                    op.name, crc+circ_op.controls[0][2:],
-                    crt+circ_op.targets[0][2:], time=time)
+                    op.name, t0+circ_op.targets[0][2:],
+                    t1+circ_op.targets[1][2:], time=time)
+
+    @overload
+    def append(name: str,
+               target: int | tuple,
+               time: int | list[int] | None = None,
+               ) -> None:
+        ...
+
+    @overload
+    def append(name: str,
+               control: int | tuple,
+               target: int | tuple,
+               time: int | list[int] | None = None,
+               ) -> None:
+        ...
+
+    @overload
+    def append(name: str,
+               target: int | tuple,
+               params: float | list[float] = None,
+               time: int | list[int] | None = None,
+               ) -> None:
+        ...
+
+    @overload
+    def append(name: str,
+               control: int | tuple,
+               target: int | tuple,
+               params: float | list[float] = None,
+               time: int | list[int] | None = None,
+               ) -> None:
+        ...
 
     def append(self,
-               *args: Any,
-               time: Optional[Union[int, list[int]]] = None) -> None:
+               *args,
+               time=None,
+               ):
         """
         Append a new operation to the circuit.
 
@@ -342,10 +364,13 @@ class Circuit:
         ----------
         name : str
             Name of operation.
-        controls and target : int or tuple
+        control and target : int or tuple
             The address of any control or target qubits.
-        time : int or [1], optional
+        time : int or [1] or None, optional
             The time at which to append the operation. The default is None.
+        params : float or list[float]
+            If the gate is parameterized, this must be equal to the number of
+            params passed.
 
         Raises
         ------
@@ -356,21 +381,47 @@ class Circuit:
         # construct the operation if needed
         if len(args) == 1 and type(args[0]) is Operation:
             op = args[0]
-        elif type(args[0]) is str:
-            name = args[0].upper()
-            if len(args) == 1 and name in _zero_qubit_operations:
-                pass
-            elif len(args) == 2 and name in _one_qubit_operations:
-                target = self._standardize_addresses(args[1])
-                op = Operation(name, [target])  # type: ignore
-            elif len(args) == 3 and name in _two_qubit_operations:
-                [control, target] = self._standardize_addresses([args[1],
-                                                                 args[2]])
-                op = Operation(name, [target], [control])
-            else:
-                raise Exception('Not a valid operation')
         else:
-            raise Exception('Not a valid operation')
+            if type(args[0]) is not str:
+                raise Exception('Operation name must be str.')
+            name = args[0].upper()
+
+            # first do some type checking
+            op_info = _operations.get(name, False)
+            N = op_info["num_targets"]
+            if not op_info:
+                raise Exception('Not a known operation.')
+            elif len(args) != N + 1 + op_info["is_parameterized"]:
+                s = f'{name} takes {N} targets.'
+                if op_info["is_parameterized"]:
+                    s += f' And a {op_info["num_parameters"]} parameters list.'
+                raise Exception(s) 
+            elif any(not isinstance(t, (int, tuple)) for t in args[1:N+1]):
+                raise Exception('Target is not an int or tuple.')
+            elif op_info['is_parameterized']:
+                if (op_info['num_parameters'] == 1
+                    and type(parameters) is not float):
+                    raise Exception('parameter must be a float.')
+                elif op_info['num_parameters'] > 1:
+                    if (type(parameters) is not list
+                        or len(parameters) != op_info['num_parameters']):
+                            raise Exception(f'{name} needs \
+{op_info["num_parameters"]} parameters')
+                           
+            # now construct the operation
+            if op_info['is_parameterized']:
+                if op_info['is_parameterized'] == 1:
+                    parameters = list(args[N+1])
+                else:
+                    parameters = args[N+1]
+            else:
+                parameters = None
+
+            if op_info['num_targets'] >= 1:
+                targets = self._standardize_addresses(list(args[1:N+1]))
+                op = Operation(name, targets, parameters=parameters)
+            else:
+                op = Operation(name, [], parameters=parameters)
 
         # Insert the operation into the circuit
         if op.targets[0][0] == 0:
@@ -384,13 +435,6 @@ class Circuit:
                 else:
                     tp = Timepoint(op)
                     self.timepoints.append(tp)
-
-                # if len(self.timepoints) == 0 \
-                #         or not self.timepoints[-1].can_append(op):
-                #     tp = Timepoint(op)
-                #     self.timepoints.append(tp)
-                # else:
-                #     self.timepoints[-1].append(op)
             elif time == [1]:
                 tp = Timepoint(op)
                 self.timepoints.append(tp)
@@ -683,15 +727,15 @@ class Circuit:
         qasm_str = ''
 
         for op in self:
-            t = self.register[op.targets[0]].constituent_register.index
+            t0 = self.register[op.targets[0]].constituent_register.index
             if op.name[:7] == 'X_ERROR':
                 continue
             elif op.name == 'R':
-                op_str = f'reset q[{t}];\n'
+                op_str = f'reset q[{t0}];\n'
             elif op.name == 'MR' or op.name == 'M':
-                op_str = f'measure q[{t}] -> c[{t}];\n'
+                op_str = f'measure q[{t0}] -> c[{t0}];\n'
             elif op.name == 'I':
-                op_str = f'id q[{t}];\n'
+                op_str = f'id q[{t0}];\n'
             # elif op.name == 'TICK':
             #     op_str = 'barrier '
             #     for i in range(t, op[3]+1):
@@ -700,12 +744,12 @@ class Circuit:
             else:
                 op_str = op.name.lower() + ' '
                 # followed by one or two arguments
-                if not op.is_controlled:
-                    op_str += f'q[{t}];\n'
+                if op.num_affected_qubits == 1:
+                    op_str += f'q[{t0}];\n'
                 else:
-                    c = self.register[op.controls[0]
-                                      ].constituent_register.index
-                    op_str += f'q[{c}],q[{t}];\n'
+                    t1 = self.register[op.targets[1]].\
+                            constituent_register.index
+                    op_str += f'q[{t0}],q[{t1}];\n'
 
             qasm_str += op_str
 
@@ -736,13 +780,13 @@ class Circuit:
                 indent = '    '
                 stim_str += f'REPEAT {tp.repeat_repetitions}' + ' {\n'
             for op in tp:
-                t = self.register[op.targets[0]].constituent_register.index
-                if not op.is_controlled:
-                    stim_str += indent + f'{op.name} {t}\n'
+                t0 = self.register[op.targets[0]].constituent_register.index
+                if op.num_affected_qubits == 1:
+                    stim_str += indent + f'{op.name} {t0}\n'
                 else:
-                    c = self.register[op.controls[0]
-                                      ].constituent_register.index
-                    stim_str += indent + f'{op.name} {c} {t}\n'
+                    t1 = self.register[op.targets[1]].\
+                                            constituent_register.index
+                    stim_str += indent + f'{op.name} {t0} {t1}\n'
             if tp.repeat_end:
                 indent = ''
                 stim_str += '}\n'
@@ -767,13 +811,13 @@ class Circuit:
         for op in self:
             if op.name in validops:
                 L = [1 for i in range(self.num_qubits)]
-                target_qubit = lm_dict[op.targets[0]]
-                if not op.is_controlled:
-                    L[target_qubit] = op.draw_str_target
+                t0 = lm_dict[op.targets[0]]
+                if op.num_affected_qubits == 1:
+                    L[t0] = op.name
                 else:
-                    control_qubit = lm_dict[op.controls[0]]
-                    L[control_qubit] = "•"
-                    L[target_qubit] = op.draw_str_target
+                    t1 = lm_dict[op.targets[1]]
+                    L[t0] = "•"
+                    L[t1] = op.name[1]
 
                 cols.append(L)
 
@@ -939,15 +983,15 @@ class Circuit:
             slices_touched_qubits = [set()]
             for op in tp.operations:
 
-                t = self.register[op.targets[0]].constituent_register.index
+                t0 = self.register[op.targets[0]].constituent_register.index
 
-                if not op.is_controlled:
-                    touched_by_op = set([t])
+                if op.num_affected_qubits == 1:
+                    touched_by_op = set([t0])
                 else:
-                    c = self.register[op.controls[0]
+                    t1 = self.register[op.targets[1]
                                       ].constituent_register.index
-                    touched_by_op = set(list(range(c, t))
-                                        + list(range(t, c)))
+                    touched_by_op = set(list(range(t1, t0))
+                                        + list(range(t0, t1)))
 
                 for s in range(len(slices)):
                     if touched_by_op.isdisjoint(slices_touched_qubits[s]):
@@ -964,30 +1008,32 @@ class Circuit:
                 touched_places = []
 
                 for op in sl:
-                    t = self.register[op.targets[0]].constituent_register.index
+                    t0 = self.register[op.targets[0]].\
+                        constituent_register.index
+                    draw_text = _operations[op.name]['draw_text']
 
-                    if not op.is_controlled:
-                        s = dash + op.draw_str_target + dash
-                        circ_disp[t].append(s)
-                        circ_disp2[t].append(space*3)
-                        touched_places.append(t)
+                    if op.num_affected_qubits == 1:
+                        s = dash + draw_text[0] + dash
+                        circ_disp[t0].append(s)
+                        circ_disp2[t0].append(space*3)
+                        touched_places.append(t0)
 
-                    elif op.is_controlled:
-                        c = self.register[op.controls[0]
+                    elif op.num_affected_qubits == 2:
+                        t1 = self.register[op.targets[1]
                                           ].constituent_register.index
-                        vert_places = list(range(c, t)) + list(range(t, c))
+                        vert_places = list(range(t1, t0)) + list(range(t0, t1))
                         for i in range(num_qubits):
-                            if i == c:
+                            if i == t0:
                                 circ_disp[i].append(
-                                    dash + op.draw_str_control + dash)
+                                    dash + draw_text[0] + dash)
                                 if i == vert_places[0]:
                                     circ_disp2[i].append(space + vert + space)
                                 else:
                                     circ_disp2[i].append(space*3)
                                 touched_places.append(i)
-                            elif i == t:
+                            elif i == t1:
                                 circ_disp[i].append(
-                                    dash + op.draw_str_target + dash)
+                                    dash + draw_text[1] + dash)
                                 if i == vert_places[0]:
                                     circ_disp2[i].append(space + vert + space)
                                 else:
@@ -1078,15 +1124,15 @@ class Circuit:
             slices_touched_qubits = [set()]
             for op in tp.operations:
 
-                t = self.register[op.targets[0]].constituent_register.index
+                t0 = self.register[op.targets[0]].constituent_register.index
 
-                if not op.is_controlled:
-                    touched_by_op = set([t])
-                else:
-                    c = self.register[op.controls[0]
+                if op.num_affected_qubits == 1:
+                    touched_by_op = set([t0])
+                elif op.num_affected_qubits == 2:
+                    t1 = self.register[op.targets[1]
                                       ].constituent_register.index
-                    touched_by_op = set(list(range(c, t))
-                                        + list(range(t, c)))
+                    touched_by_op = set(list(range(t1, t0))
+                                        + list(range(t0, t1)))
 
                 for s in range(len(slices)):
                     if touched_by_op.isdisjoint(slices_touched_qubits[s]):
@@ -1100,49 +1146,50 @@ class Circuit:
             for sl in slices:
 
                 for op in sl:
-                    t = self.register[op.targets[0]].constituent_register.index
+                    t0 = self.register[op.targets[0]].\
+                        constituent_register.index
+                    draw_img = _operations[op.name]['draw_img']
 
-                    if not op.is_controlled:
-                        width = len(op.name)*18+10
+                    if op.num_affected_qubits == 1:
+                        width = len(draw_img[0])*18+10
                         el += [
                             svg.Rect(
-                                x=slice_x+bxs, y=wirey[t]+bys,
+                                x=slice_x+bxs, y=wirey[t0]+bys,
                                 width=width, height=bh,
                                 class_=["gaterect"],
                             ),
                             svg.Text(
-                                x=slice_x+bxs+width/2, y=wirey[t]+bys+bh/2,
-                                text=op.name,
+                                x=slice_x+bxs+width/2, y=wirey[t0]+bys+bh/2,
+                                text=draw_img[0],
                                 class_=["gatetext"],
                                 text_anchor='middle',
                                 dominant_baseline='central'
                             )]
 
-                    elif op.is_controlled:
-                        c = self.register[op.controls[0]
+                    elif op.num_affected_qubits == 2:
+                        t1 = self.register[op.targets[1]
                                           ].constituent_register.index
 
-                        name_label = op._draw_img_target_dic.get(op.name,
-                                                                 op.name[-1])
+                        name_label = draw_img[1]
                         width = len(name_label)*16 + 12
 
                         el += [
                             svg.Circle(
-                                cx=slice_x+bxs+width/2, cy=wirey[c], r=3,
+                                cx=slice_x+bxs+width/2, cy=wirey[t0], r=3,
                                 class_=["control1"]
                             ),
                             svg.Line(
                                 x1=slice_x+bxs+width/2, x2=slice_x+bxs+width/2,
-                                y1=wirey[c]+ly1s, y2=wirey[t]+ly2s,
+                                y1=wirey[t0]+ly1s, y2=wirey[t1]+ly2s,
                                 class_=["controlline"]
                             ),
                             svg.Rect(
-                                x=slice_x+bxs, y=wirey[t]+bys,
+                                x=slice_x+bxs, y=wirey[t1]+bys,
                                 width=width, height=bh,
                                 class_=["gaterect"]
                             ),
                             svg.Text(
-                                x=slice_x+bxs+width/2, y=wirey[t]+bys+bh/2,
+                                x=slice_x+bxs+width/2, y=wirey[t1]+bys+bh/2,
                                 text=name_label,
                                 class_=["gatetext"],
                                 text_anchor='middle',
