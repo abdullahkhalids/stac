@@ -69,7 +69,7 @@ class Register:
         return self.__repr__()
 
     def __len__(self) -> int:
-        """Return number of operations in the Timepoint."""
+        """Return number of objects in the register."""
         return len(self.elements)
 
     def __iter__(self) -> Iterator:
