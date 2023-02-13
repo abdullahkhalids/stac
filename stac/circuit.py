@@ -5,8 +5,7 @@ from .operation import Operation
 from .timepoint import Timepoint
 from .qubit import PhysicalQubit  # , VirtualQubit
 from .register import Register, QubitRegister, RegisterRegister
-from .supportedoperations import _zero_qubit_operations,\
-    _one_qubit_operations, _two_qubit_operations, _operations
+from .supportedoperations import _operations
 
 import textwrap
 import sys
@@ -395,19 +394,19 @@ class Circuit:
                 s = f'{name} takes {N} targets.'
                 if op_info["is_parameterized"]:
                     s += f' And a {op_info["num_parameters"]} parameters list.'
-                raise Exception(s) 
+                raise Exception(s)
             elif any(not isinstance(t, (int, tuple)) for t in args[1:N+1]):
                 raise Exception('Target is not an int or tuple.')
             elif op_info['is_parameterized']:
                 if (op_info['num_parameters'] == 1
-                    and type(parameters) is not float):
+                        and type(args[-1]) is not float):
                     raise Exception('parameter must be a float.')
                 elif op_info['num_parameters'] > 1:
-                    if (type(parameters) is not list
-                        or len(parameters) != op_info['num_parameters']):
-                            raise Exception(f'{name} needs \
+                    if (type(args[-1]) is not list
+                            or len(args[-1]) != op_info['num_parameters']):
+                        raise Exception(f'{name} needs \
 {op_info["num_parameters"]} parameters')
-                           
+
             # now construct the operation
             if op_info['is_parameterized']:
                 if op_info['is_parameterized'] == 1:
@@ -989,7 +988,7 @@ class Circuit:
                     touched_by_op = set([t0])
                 else:
                     t1 = self.register[op.targets[1]
-                                      ].constituent_register.index
+                                       ].constituent_register.index
                     touched_by_op = set(list(range(t1, t0))
                                         + list(range(t0, t1)))
 
@@ -1020,7 +1019,7 @@ class Circuit:
 
                     elif op.num_affected_qubits == 2:
                         t1 = self.register[op.targets[1]
-                                          ].constituent_register.index
+                                           ].constituent_register.index
                         vert_places = list(range(t1, t0)) + list(range(t0, t1))
                         for i in range(num_qubits):
                             if i == t0:
@@ -1130,7 +1129,7 @@ class Circuit:
                     touched_by_op = set([t0])
                 elif op.num_affected_qubits == 2:
                     t1 = self.register[op.targets[1]
-                                      ].constituent_register.index
+                                       ].constituent_register.index
                     touched_by_op = set(list(range(t1, t0))
                                         + list(range(t0, t1)))
 
@@ -1168,7 +1167,7 @@ class Circuit:
 
                     elif op.num_affected_qubits == 2:
                         t1 = self.register[op.targets[1]
-                                          ].constituent_register.index
+                                           ].constituent_register.index
 
                         name_label = draw_img[1]
                         width = len(name_label)*16 + 12
