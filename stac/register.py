@@ -73,7 +73,7 @@ class Register:
         return len(self.elements)
 
     def __iter__(self) -> Iterator:
-        """Return iterator of the Timepoint."""
+        """Return iterator of the Register."""
         return self.elements.__iter__()
 
     def __getitem__(self,
