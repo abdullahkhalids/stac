@@ -23,3 +23,8 @@ Stac is currently under active development and subject to rapid change.
 ## Getting started
 Please refer to my [recent blog posts](https://abdullahkhalid.com/blog/) which
 illustrate its usage. 
+
+## Credits
+
+Thanks for Unitary Fund for funding part of the development of this project.
+[![Unitary Fund](https://img.shields.io/badge/Supported%20By-UNITARY%20FUND-brightgreen.svg?style=for-the-badge)](https://unitary.fund)

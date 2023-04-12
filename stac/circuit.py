@@ -2,11 +2,14 @@
 from IPython.display import display, SVG
 from typing import Any, Iterator, Union, Optional, overload
 from .operation import Operation
+from .annotation import Annotation, AnnotationSlice
 from .timepoint import Timepoint
 from .qubit import PhysicalQubit  # , VirtualQubit
 from .register import Register, QubitRegister, RegisterRegister
 from .supportedoperations import _operations
+from .instructionblock import InstructionBlock, AnnotationBlock
 
+from itertools import chain
 import textwrap
 import sys
 
@@ -80,6 +83,9 @@ class Circuit:
         Register:
             If passed, then the Register is appended to the circuit.
         """
+        self.instructions: InstructionBlock = InstructionBlock()
+        self.annotations: AnnotationBlock = AnnotationBlock()
+        self.annotations.append(AnnotationSlice())
         self.timepoints: list[Timepoint] = []
         self._cur_time = 0
 
@@ -87,7 +93,7 @@ class Circuit:
         self.register.index = 0
 
         self.register.append(RegisterRegister('level0', -1))
-        self.register.structure = self._structure  # type: ignore
+        self.register.structure = self._structure
 
         if (len(args) == 1
                 and type(args[0]) in [RegisterRegister, QubitRegister]):
@@ -123,12 +129,22 @@ class Circuit:
 
     def __repr__(self) -> str:
         """Return a representation of the object."""
-        label_len = len(str(len(self.timepoints)-1))+1
+        label_len = len(str(len(self.instructions)-1))+1
         s = ''
-        for i, tp in enumerate(self.timepoints):
+
+        anns = self.annotations[0]
+        if len(anns):
+            st = textwrap.indent(str(anns), ' '*label_len) + '\n'
+            s += st
+        for i, tp in enumerate(self.instructions):
             st = textwrap.indent(str(tp), ' '*label_len)
             st = str(i).rjust(label_len-1) + st[label_len-1:] + '\n'
             s += st
+
+            anns = self.annotations[i+1]
+            if len(anns):
+                st = textwrap.indent(str(anns), ' '*label_len) + '\n'
+                s += st
 
         return s
 
@@ -136,11 +152,20 @@ class Circuit:
         """Return a string representation of the object."""
         return self.__repr__()
 
+    def __len__(self) -> int:
+        """Return number of operations in the quantum circuit."""
+        return sum([len(ins) for ins in self.instructions]) \
+            + sum([len(anns) for anns in self.annotations])
+
     def __iter__(self) -> Iterator:
         """Return iterator for the quantum circuit."""
-        for tp in self.timepoints:
-            for op in tp:
+        for ann in self.annotations[0]:
+            yield ann
+        for i in range(len(self.instructions)):
+            for op in self.instructions[i]:
                 yield op
+            for ann in self.annotations[i+1]:
+                yield ann
 
     def __getitem__(self,
                     ind: int) -> Operation:
@@ -164,36 +189,42 @@ class Circuit:
 
         """
         if ind >= 0:
-            iterator = self.timepoints.__iter__()
-            compare = int.__gt__
-            inc = int.__add__
+            chunks = zip(self.instructions, self.annotations)
+            range_parameter = ind + 1
         else:
-            iterator = reversed(self.timepoints)
-            compare = int.__le__
-            inc = int.__sub__
+            chunks = zip(
+                map(reversed, reversed(self.annotations)),
+                map(reversed, reversed(self.instructions)),
+            )
+        range_parameter = abs(ind)
+        iterator = chain.from_iterable(chain.from_iterable(chunks))
 
-        s = 0
-        for tp in iterator:
-            L = len(tp)
-            if compare(inc(s, L), ind):
-                return tp[ind-s]  # type: ignore
-            else:
-                s = inc(s, L)
-        else:
-            raise IndexError('circuit index out of range')
+        try:
+            for _ in range(range_parameter):
+                n = next(iterator)
+        except StopIteration:
+            raise IndexError("index out of range")
 
-    def __len__(self) -> int:
-        """Return number of operations in the quantum circuit."""
-        return sum([len(tp) for tp in self.timepoints])
+        return n
 
     def reverse(self) -> 'Circuit':
         """Return a circuit in which all operations are reversed."""
         rev_circuit = Circuit()
         rev_circuit.register = self.register.copy()
-        for tp in reversed(self.timepoints):
+        # for tp in reversed(self.instructions):
+        #     rev_circuit._append_tp(Timepoint())
+        #     for op in reversed(tp.operations):
+        #         rev_circuit.append(op, time=-1)
+        rev_circuit.annotations.elements.clear()
+        for i in range(len(self.instructions)-1, -1, -1):
             rev_circuit._append_tp(Timepoint())
-            for op in reversed(tp.operations):
-                rev_circuit.append(op, time=-1)
+            for ann in reversed(self.annotations[i+1].annotations):
+                rev_circuit.annotations[-1].append(ann)
+            for op in reversed(self.instructions[i].operations):
+                rev_circuit.instructions[-1].append(op)
+        rev_circuit.annotations.append(AnnotationSlice())
+        for ann in self.annotations[0].annotations:
+            rev_circuit.annotations[-1].append(ann)
 
         return rev_circuit
 
@@ -223,7 +254,7 @@ class Circuit:
 
         """
         self._cur_time = new_time
-        while self._cur_time >= len(self.timepoints):
+        while self._cur_time >= len(self.instructions):
             self._append_tp(Timepoint())
 
     def _standardize_addresses(self,
@@ -303,7 +334,7 @@ class Circuit:
 
         if op.num_affected_qubits == 1:
             for circ_op in circ:
-                if not circ_op.num_affected_qubits == 1:
+                if circ_op.num_affected_qubits == 1:
                     self.append(circ_op.name,
                                 t0+circ_op.targets[0][2:],
                                 time=time)
@@ -380,6 +411,10 @@ class Circuit:
         # construct the operation if needed
         if len(args) == 1 and type(args[0]) is Operation:
             op = args[0]
+            ins_type = 0
+        elif len(args) == 1 and type(args[0]) is Annotation:
+            ann = args[0]
+            ins_type = 1
         else:
             if type(args[0]) is not str:
                 raise Exception('Operation name must be str.')
@@ -393,7 +428,7 @@ class Circuit:
             elif len(args) != N + 1 + op_info["is_parameterized"]:
                 s = f'{name} takes {N} targets.'
                 if op_info["is_parameterized"]:
-                    s += f' And a {op_info["num_parameters"]} parameters list.'
+                    s += f' And a {op_info["num_parameters"]} parameter list.'
                 raise Exception(s)
             elif any(not isinstance(t, (int, tuple)) for t in args[1:N+1]):
                 raise Exception('Target is not an int or tuple.')
@@ -416,50 +451,64 @@ class Circuit:
             else:
                 parameters = None
 
-            if op_info['num_targets'] >= 1:
+            if op_info['ins_type'] == 0:
                 targets = self._standardize_addresses(list(args[1:N+1]))
                 op = Operation(name, targets, parameters=parameters)
+                ins_type = 0
             else:
-                op = Operation(name, [], parameters=parameters)
+                ann = Annotation(name)
+                ins_type = 1
 
-        # Insert the operation into the circuit
+        # Insert annotation into the circuit
+        if ins_type == 1:
+            if len(self.instructions) == 0:
+                self.annotations[0].append(ann)
+            else:
+                self.annotations[self.cur_time+1].append(ann)
+            return
+
+        # Insert instruction into the circuit
         if op.targets[0][0] == 0:
             if time is None:
-                while self.cur_time < len(self.timepoints):
-                    if self.timepoints[self.cur_time].can_append(op):
-                        self.timepoints[self.cur_time].append(op)
+                while self.cur_time < len(self.instructions):
+                    if self.instructions[self.cur_time].can_append(op):
+                        self.instructions[self.cur_time].append(op)
                         break
                     else:
                         self.cur_time += 1
                 else:
                     tp = Timepoint(op)
-                    self.timepoints.append(tp)
+                    self._append_tp(tp)
             elif time == [1]:
                 tp = Timepoint(op)
-                self.timepoints.append(tp)
+                self._append_tp(tp)
             elif type(time) is int:
-                while time >= len(self.timepoints):
+                while time >= len(self.instructions):
                     self._append_tp(Timepoint())
-                if not self.timepoints[time].can_append(op):
+                if not self.instructions[time].can_append(op):
                     raise Exception('Cannot add operation to given timepoint.')
                 else:
-                    self.timepoints[time].append(op)
+                    self.instructions[time].append(op)
 
         else:
             self._apply_encoded_operation(op, time=time)
 
     def _append_tp(self,
-                   tp: Timepoint) -> None:
+                   tp: Timepoint = Timepoint(),
+                   anns: AnnotationSlice = AnnotationSlice()) -> None:
         """
         Append Timepoint to circuit.
 
         Parameters
         ----------
         tp : Timepoint
-            Timepoint to be appended.
+            Timepoint to be appended. The default is an empty Timepoint.
+        anns: AnnotationSlice
+            AnnotationSlice to be appended. The default is an empty one.
 
         """
-        self.timepoints.append(tp.copy())
+        self.instructions.append(tp.copy())
+        self.annotations.append(anns.copy())
 
     def append_register(self,
                         register: Register
@@ -606,47 +655,47 @@ class Circuit:
                 self._append_tp(tp.rebase_qubits(new_base))
         else:
             # decide where to start timeing the timepoints
-            if time >= 0 and time < len(self.timepoints):
+            if time >= 0 and time < len(self.instructions):
                 k = time
-            elif time == 0 and len(self.timepoints) == 0:
+            elif time == 0 and len(self.instructions) == 0:
                 k = time
-            elif time < 0 and abs(time) <= len(self.timepoints):
-                k = len(self.timepoints) + time
+            elif time < 0 and abs(time) <= len(self.instructions):
+                k = len(self.instructions) + time
             else:
                 raise KeyError('Invalid time point.')
 
             # check to make sure we can actually insert from this point
             for i, tp in enumerate(other.timepoints):
-                if k+i < len(self.timepoints):
-                    if not self.timepoints[k+i].can_add(
+                if k+i < len(self.instructions):
+                    if not self.instructions[k+i].can_add(
                             tp.rebase_qubits(new_base)):
                         raise Exception('Cannot add circuits.')
 
             # add the timepoints
             for i, tp in enumerate(other.timepoints):
-                if k+i < len(self.timepoints):
-                    self.timepoints[k+i] += tp.rebase_qubits(new_base)
+                if k+i < len(self.instructions):
+                    self.instructions[k+i] += tp.rebase_qubits(new_base)
                 else:
                     self._append_tp(tp)
 
-    def start_repeat(self,
-                     repetitions: int) -> None:
-        """
-        Start a repeat block with a new Timepoint.
+    # def start_repeat(self,
+    #                  repetitions: int) -> None:
+    #     """
+    #     Start a repeat block with a new Timepoint.
 
-        Parameters
-        ----------
-        repetitions : int
-            The number of repetitions of the block.
+    #     Parameters
+    #     ----------
+    #     repetitions : int
+    #         The number of repetitions of the block.
 
-        """
-        self._append_tp(Timepoint())
-        self.timepoints[-1].repeat_start = True
-        self.timepoints[-1].repeat_repetitions = repetitions
+    #     """
+    #     self._append_tp(Timepoint())
+    #     self.timepoints[-1].repeat_start = True
+    #     self.timepoints[-1].repeat_repetitions = repetitions
 
-    def end_repeat(self) -> None:
-        """Turn last Timepoint as end of repeat block."""
-        self.timepoints[-1].repeat_end = True
+    # def end_repeat(self) -> None:
+    #     """Turn last Timepoint as end of repeat block."""
+    #     self.timepoints[-1].repeat_end = True
 
     def __add__(self,
                 other: 'Circuit'
@@ -675,11 +724,11 @@ class Circuit:
 
         new_circuit = copy.deepcopy(self)
 
-        new_circuit._append_tp(Timepoint())
+        new_circuit.annotations[-1].elements += other.annotations[0].elements
 
-        for tp in other.timepoints:
-            for op in tp:
-                new_circuit.append(op)
+        for i in range(len(other.instructions)):
+            new_circuit._append_tp(other.instructions[i],
+                                   other.annotations[i+1])
 
         new_circuit.custom_gates = (self.custom_gates
                                     + '\n'
@@ -726,35 +775,22 @@ class Circuit:
         qasm_str = ''
 
         for op in self:
-            t0 = self.register[op.targets[0]].constituent_register.index
-            if op.name[:7] == 'X_ERROR':
+            if _operations[op.name]['num_targets'] == 0:
+                qasm_str += _operations[op.name]['qasm_str']
                 continue
-            elif op.name == 'R':
-                op_str = f'reset q[{t0}];\n'
-            elif op.name == 'MR' or op.name == 'M':
-                op_str = f'measure q[{t0}] -> c[{t0}];\n'
-            elif op.name == 'I':
-                op_str = f'id q[{t0}];\n'
-            # elif op.name == 'TICK':
-            #     op_str = 'barrier '
-            #     for i in range(t, op[3]+1):
-            #         op_str += f'q[{i}],'
-            #     op_str = op_str[:-1] + ';\n'
-            else:
-                op_str = op.name.lower() + ' '
-                # followed by one or two arguments
-                if op.num_affected_qubits == 1:
-                    op_str += f'q[{t0}];\n'
-                else:
-                    t1 = self.register[op.targets[1]].\
-                            constituent_register.index
-                    op_str += f'q[{t0}],q[{t1}];\n'
 
-            qasm_str += op_str
+            t0 = self.register[op.targets[0]].constituent_register.index
+            if op.num_affected_qubits == 1:
+                qasm_str += _operations[op.name]['qasm_str'].format(t0=t0)
+            else:
+                t1 = self.register[op.targets[1]].\
+                        constituent_register.index
+                qasm_str += _operations[op.name]['qasm_str'].format(
+                                                                t0=t0, t1=t1)
 
         qasm_str = 'OPENQASM 2.0;\ninclude "qelib1.inc";\n' \
             + self.custom_gates \
-            + f'\nqreg q[{self.num_qubits}];\ncreg c[{self.num_qubits}];\n' \
+            + f'\nqreg q[{self.num_qubits}];\ncreg c[{self.num_qubits}];\n\n' \
             + qasm_str
 
         return qasm_str
@@ -774,7 +810,7 @@ class Circuit:
         stim_str = ''
 
         indent = ''
-        for tp in self.timepoints:
+        for tp in self.instructions:
             if tp.repeat_start:
                 indent = '    '
                 stim_str += f'REPEAT {tp.repeat_repetitions}' + ' {\n'
@@ -977,7 +1013,8 @@ class Circuit:
 
         # circ_tp_line = [space*(label_len+1)]
 
-        for tp in self.timepoints:
+        for k, tp in enumerate(self.instructions):
+            tp = self.instructions[k]
             slices = [[]]
             slices_touched_qubits = [set()]
             for op in tp.operations:
@@ -1048,6 +1085,13 @@ class Circuit:
                         circ_disp[i].append(dash*3)
                         circ_disp2[i].append(space*3)
 
+            for ann in self.annotations[k+1]:
+                if ann.name == 'TICK':
+                    for i in range(num_qubits-1):
+                        circ_disp[i].append('⸽')
+                        circ_disp2[i].append('⸽')
+                    circ_disp[num_qubits-1].append('⸽')
+
         if filename is None:
             file = sys.stdout
         else:
@@ -1114,7 +1158,8 @@ class Circuit:
         slice_x = x0
         recs = []
         highlight_class = "tp_highlight1"
-        for tp in self.timepoints:
+
+        for k, tp in enumerate(self.instructions):
             highlight_class = "tp_highlight1" \
                 if highlight_class == "tp_highlight2" else "tp_highlight2"
             start_time = slice_x
@@ -1198,6 +1243,16 @@ class Circuit:
                     max_width = max(max_width, width)
                 time += 1
                 slice_x += max_width+bxs
+
+            for ann in self.annotations[k+1]:
+                if ann.name == 'TICK':
+                    el += [
+                        svg.Line(
+                            x1=slice_x+0.5*bxs, x2=slice_x+0.5*bxs,
+                            y1=0, y2=wirey[-1]+y_shift,
+                            class_=["tickline"]
+                            )]
+
             if highlight_timepoints:
                 recs.append(svg.Rect(
                     x=start_time+bxs/2, y=0,
@@ -1214,6 +1269,7 @@ class Circuit:
             .gaterect { fill: white; stroke: black; stroke-width: 2 }
             .control1 { fill: black; stroke: black; stroke-width: 1 }
             .controlline { stroke: black; stroke-width: 2}
+            .tickline { stroke: black; stroke-width: 2; stroke-dasharray: 3,3}
             .tp_highlight1 { fill: red; opacity: 0.2;}
             .tp_highlight2 { fill: blue; opacity: 0.2;}
                 """)] + recs + \

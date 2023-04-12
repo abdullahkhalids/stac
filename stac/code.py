@@ -436,7 +436,7 @@ class Code:
     def construct_logical_gate_circuits(
             self,
             syndrome_measurement_type: str = 'non_ft'
-            ):
+    ):
         """
         Create the circuits that implement logical circuits for the code.
 
@@ -560,7 +560,7 @@ class Code:
     def construct_data_register(
             self,
             level: int
-            ) -> RegisterRegister:
+    ) -> RegisterRegister:
         """
         Create a data qubit register for this code.
 
@@ -581,7 +581,7 @@ class Code:
             self,
             level: int,
             syndrome_measurement_type: str = 'non_ft'
-            ) -> RegisterRegister:
+    ) -> RegisterRegister:
         """
         Create a register appropriate for doing syndrome measurements.
 
@@ -626,7 +626,7 @@ class Code:
             self,
             level: int,
             syndrome_measurement_type: str = 'non_ft'
-            ) -> RegisterRegister:
+    ) -> RegisterRegister:
         """
         Create a register appropriate for creating an encoded qubit.
 
@@ -941,3 +941,51 @@ class Code:
             self.syndrome_circuit.append('MR', (0, 0, 1, i, 0, 0))
 
         return self.syndrome_circuit
+
+    def construct_encoded_qubit(self, J, syndrome_measurement_type='non_ft'):
+
+        self.construct_syndrome_circuit(syndrome_measurement_type)
+        circ = Circuit()
+
+        # add one qubit at level J
+        address = circ.append_register(QubitRegister('l', J, 1))
+        next_addresses = []
+        next_addresses.append(address)
+
+        for j in range(J-1, -1, -1):
+            prev_addresses = next_addresses.copy()
+            next_addresses = []
+            for paddress in prev_addresses:
+                for qubit in circ.register[paddress].qubits('l'):
+                    address = circ.append_register(
+                        self.construct_encoded_qubit_register(j, syndrome_measurement_type))
+                    qubit.constituent_register = address
+                    qubit.index_in_constituent_register = 0
+                    next_addresses.append(address)
+                for qubit in circ.register[paddress].qubits('d'):
+                    address = circ.append_register(
+                        self.construct_encoded_qubit_register(j, syndrome_measurement_type))
+                    qubit.constituent_register = address
+                    qubit.index_in_constituent_register = 0
+                    next_addresses.append(address)
+                for qubit in circ.register[paddress].qubits('s'):
+                    sreg = RegisterRegister(
+                        's', j, QubitRegister('g', j, self.num_physical_qubits))
+                    sreg.code = self
+                    address = circ.append_register(sreg)
+                    qubit.constituent_register = address
+                    qubit.index_in_constituent_register = 0
+                    next_addresses.append(address)
+
+        for j in range(0, J):
+            w = len(circ.timepoints)
+
+            for reg in circ.register[j]:
+                if reg.register_type != 'e':
+                    continue
+                circ.cur_time = w
+                for tp in self.syndrome_circuit.instructions:
+                    for op in tp:
+                        circ.append(op.rebase_qubits((reg.level, reg.index)))
+                    circ.cur_time += 1
+        return circ
