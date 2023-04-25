@@ -168,7 +168,8 @@ class Circuit:
                 yield ann
 
     def __getitem__(self,
-                    ind: int) -> Operation:
+                    ind: int
+                    ) -> Operation:
         """
         Make circuit operations subscriptable.
 
@@ -196,16 +197,16 @@ class Circuit:
                 map(reversed, reversed(self.annotations)),
                 map(reversed, reversed(self.instructions)),
             )
-        range_parameter = abs(ind)
+            range_parameter = abs(ind)
         iterator = chain.from_iterable(chain.from_iterable(chunks))
 
         try:
             for _ in range(range_parameter):
-                n = next(iterator)
+                op = next(iterator)
         except StopIteration:
             raise IndexError("index out of range")
 
-        return n
+        return op
 
     def reverse(self) -> 'Circuit':
         """Return a circuit in which all operations are reversed."""
@@ -218,15 +219,22 @@ class Circuit:
         rev_circuit.annotations.elements.clear()
         for i in range(len(self.instructions)-1, -1, -1):
             rev_circuit._append_tp(Timepoint())
-            for ann in reversed(self.annotations[i+1].annotations):
+            for ann in reversed(self.annotations[i+1].elements):
                 rev_circuit.annotations[-1].append(ann)
             for op in reversed(self.instructions[i].operations):
                 rev_circuit.instructions[-1].append(op)
         rev_circuit.annotations.append(AnnotationSlice())
-        for ann in self.annotations[0].annotations:
+        for ann in self.annotations[0].elements:
             rev_circuit.annotations[-1].append(ann)
 
         return rev_circuit
+
+    def clear(self) -> None:
+        """Remove all operations and annotations from circuit."""
+        self.instructions: InstructionBlock = InstructionBlock()
+        self.annotations: AnnotationBlock = AnnotationBlock()
+        self.annotations.append(AnnotationSlice())
+        self._cur_time = 0
 
     @property
     def cur_time(self) -> int:
@@ -253,9 +261,10 @@ class Circuit:
             The time to set.
 
         """
-        self._cur_time = new_time
-        while self._cur_time >= len(self.instructions):
-            self._append_tp(Timepoint())
+        if new_time >= 0:
+            self._cur_time = new_time
+        else:
+            self._cur_time = len(self.instructions) + new_time
 
     def _standardize_addresses(self,
                                addresses: list[tuple]
@@ -444,8 +453,8 @@ class Circuit:
 
             # now construct the operation
             if op_info['is_parameterized']:
-                if op_info['is_parameterized'] == 1:
-                    parameters = list(args[N+1])
+                if op_info['num_parameters'] == 1:
+                    parameters = [args[N+1]]
                 else:
                     parameters = args[N+1]
             else:
@@ -459,12 +468,19 @@ class Circuit:
                 ann = Annotation(name)
                 ins_type = 1
 
+        if time is None:
+            while self._cur_time >= len(self.instructions):
+                self._append_tp()
+
         # Insert annotation into the circuit
         if ins_type == 1:
             if len(self.instructions) == 0:
                 self.annotations[0].append(ann)
             else:
                 self.annotations[self.cur_time+1].append(ann)
+                if ann.name == 'TICK':
+                    # self._append_tp()
+                    self.cur_time += 1
             return
 
         # Insert instruction into the circuit
@@ -729,6 +745,7 @@ class Circuit:
         for i in range(len(other.instructions)):
             new_circuit._append_tp(other.instructions[i],
                                    other.annotations[i+1])
+        new_circuit.cur_time = -1
 
         new_circuit.custom_gates = (self.custom_gates
                                     + '\n'
@@ -781,7 +798,11 @@ class Circuit:
 
             t0 = self.register[op.targets[0]].constituent_register.index
             if op.num_affected_qubits == 1:
-                qasm_str += _operations[op.name]['qasm_str'].format(t0=t0)
+                if op.is_parameterized:
+                    qasm_str += _operations[op.name]['qasm_str'].format(
+                        p0=op.parameters[0], t0=t0)
+                else:
+                    qasm_str += _operations[op.name]['qasm_str'].format(t0=t0)
             else:
                 t1 = self.register[op.targets[1]].\
                         constituent_register.index
@@ -811,9 +832,9 @@ class Circuit:
 
         indent = ''
         for tp in self.instructions:
-            if tp.repeat_start:
-                indent = '    '
-                stim_str += f'REPEAT {tp.repeat_repetitions}' + ' {\n'
+            # if tp.repeat_start:
+            #     indent = '    '
+            #     stim_str += f'REPEAT {tp.repeat_repetitions}' + ' {\n'
             for op in tp:
                 t0 = self.register[op.targets[0]].constituent_register.index
                 if op.num_affected_qubits == 1:
@@ -822,9 +843,9 @@ class Circuit:
                     t1 = self.register[op.targets[1]].\
                                             constituent_register.index
                     stim_str += indent + f'{op.name} {t0} {t1}\n'
-            if tp.repeat_end:
-                indent = ''
-                stim_str += '}\n'
+            # if tp.repeat_end:
+            #     indent = ''
+            #     stim_str += '}\n'
 
         return stim_str
 
@@ -894,14 +915,15 @@ class Circuit:
 
         tab = [[bin(i)[2:][-1::-1].ljust(n, '0')] for i in range(2**n)]
 
-        cur_circ = []
+        cur_circ = copy.deepcopy(self)
+        cur_circ.clear()
 
         for ind, op in enumerate(self):
             if ((op.name == 'TICK' and incremental)
                     or ind == len(self)-1):
                 cur_circ.append(op)
-                cur_circ.append(["id", n-1])
-                qc = QuantumCircuit.from_qasm_str(self.qasm())
+                # cur_circ.append("I", n-1)
+                qc = QuantumCircuit.from_qasm_str(cur_circ.qasm())
                 job = execute(qc, Aer.get_backend('statevector_simulator'),
                               shots=1,
                               optimization_level=0)
@@ -1122,7 +1144,7 @@ class Circuit:
             self.map_to_physical_layout()
 
         y_shift = 20
-        bxs = 8
+        bxs = 15
         bh = 26
         bys = -bh/2
         ly1s = 3
@@ -1269,7 +1291,7 @@ class Circuit:
             .gaterect { fill: white; stroke: black; stroke-width: 2 }
             .control1 { fill: black; stroke: black; stroke-width: 1 }
             .controlline { stroke: black; stroke-width: 2}
-            .tickline { stroke: black; stroke-width: 2; stroke-dasharray: 3,3}
+            .tickline { stroke: black; stroke-width: 0.75; stroke-dasharray: 6,3}
             .tp_highlight1 { fill: red; opacity: 0.2;}
             .tp_highlight2 { fill: blue; opacity: 0.2;}
                 """)] + recs + \

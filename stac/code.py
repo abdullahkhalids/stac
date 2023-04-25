@@ -10,7 +10,7 @@ import numpy as np
 # from .qubit import PhysicalQubit, VirtualQubit
 from .register import QubitRegister, RegisterRegister
 from .circuit import Circuit
-from .supportedoperations import _quantum_operations
+from .supportedoperations import _operations
 
 
 def print_matrix(array: Any,
@@ -304,7 +304,7 @@ class Code:
         self.logical_xs = None
         self.logical_zs = None
         self.logical_circuits: dict[str, Optional[Circuit]] = dict()
-        for op in _quantum_operations:
+        for op in _operations:
             self.logical_circuits[op] = None
 
         self.encoding_circuit = None
@@ -748,24 +748,29 @@ class Code:
             self.construct_logical_operators()
 
         n = self.num_physical_qubits
+        k = self.num_logical_qubits
 
         self.decoding_circuit = Circuit()
+        reg = self.construct_data_register(0)
+        self.decoding_circuit.append_register(reg)
+        self.decoding_circuit.append_register(QubitRegister('a', 0, k))
+        self.decoding_circuit.base_address = (0,)
 
         # Note, we will need num_logical_qubits ancilla
         for i in range(len(self.logical_zs)):
             for j in range(n):
                 if self.logical_zs[i, n+j]:
-                    self.decoding_circuit.append(["CX", j, n+i])
+                    self.decoding_circuit.append("CX", (0, j), (1, i))
 
         for i in range(len(self.logical_xs)):
             for j in range(n):
                 if self.logical_xs[i, j] and self.logical_xs[i, n+j]:
-                    self.decoding_circuit.append(["CZ", n+i, j])
-                    self.decoding_circuit.append(["CX", n+i, j])
+                    self.decoding_circuit.append("CZ", (1, i), (0, j))
+                    self.decoding_circuit.append("CX", (1, i), (0, j))
                 elif self.logical_xs[i, j]:
-                    self.decoding_circuit.append(["CX", n+i, j])
+                    self.decoding_circuit.append("CX", (1, i), (0, j))
                 elif self.logical_xs[i, n+j]:
-                    self.decoding_circuit.append(["CZ", n+i, j])
+                    self.decoding_circuit.append("CZ", (1, i), (0, j))
 
         return self.decoding_circuit
 

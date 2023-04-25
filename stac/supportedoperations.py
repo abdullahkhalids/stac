@@ -8,28 +8,8 @@ num_targets: int
     instruction can take any number of targets.
 """
 
-_single_qubit_gates = {'I', 'X', 'Y', 'Z', 'H', 'S', 'T'}
-_two_qubit_gates = {'CX', 'CY', 'CZ'}
-_measurements = {'R', 'M', 'MR'}
-_circuit_annotations = {'TICK'}
-
-_zero_qubit_operations = _circuit_annotations
-_one_qubit_operations = set.union(_single_qubit_gates,
-                                  _measurements)
-_two_qubit_operations = _two_qubit_gates
-
-_quantum_operations = set.union(
-    _single_qubit_gates,
-    _two_qubit_gates,
-    _measurements,
-)
-
-_circuit_operations = set.union(
-    _quantum_operations,
-    _circuit_annotations
-)
-
 _operations = dict()
+
 for name in ['I', 'X', 'Y', 'Z', 'H', 'S', 'T']:
     _operations[name] = {
         'ins_type': 0,
@@ -40,6 +20,17 @@ for name in ['I', 'X', 'Y', 'Z', 'H', 'S', 'T']:
         'qasm_str': name.lower() + ' q[{t0}];\n'
         }
 _operations['I']['qasm_str'] = 'id q[{t0}];\n'
+
+for name in ['RX', 'RY', 'RZ']:
+    _operations[name] = {
+        'ins_type': 0,
+        'is_parameterized': True,
+        'num_targets': 1,
+        'num_parameters': 1,
+        'draw_text': [name],
+        'draw_img': [name],
+        'qasm_str': name.lower() + '({p0}) q[{t0}];\n'
+        }
 
 for name in ['CX', 'CY', 'CZ']:
     _operations[name] = {
@@ -74,5 +65,5 @@ for name in ['TICK']:
         'is_parameterized': False,
         'num_targets': 0,
         }
-_operations['TICK']['qasm_str'] = 'barrier;\n'
+_operations['TICK']['qasm_str'] = 'barrier q;\n'
 
