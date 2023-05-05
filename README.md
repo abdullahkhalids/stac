@@ -20,7 +20,7 @@ number of useful functions. You can
 
 ## Development version
 Stac is currently undergoing a complete overwrite to make it suitable for
-constructing fault-tolerant circuits. The goals and progress (18 Jan 2023)
+constructing fault-tolerant circuits. The goals and progress
 
 * [x] There is an intrinsic notion of encoded qubits at any concatenation
       level in the circuit. User can create registers of such qubits.
@@ -38,8 +38,8 @@ Documentation will be made available once the developmental version is ready
 to be merged into `main`. 
 
 ## Getting started
-Please refer to my [recent blog posts](https://abdullahkhalid.com/blog/) which
-illustrate its usage. 
+Please refer to my [mini-book](https://abdullahkhalid.com/qecft/introduction/stac/) which
+illustrate installation and usage.
 
 ## Credits
 
