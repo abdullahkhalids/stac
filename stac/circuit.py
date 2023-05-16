@@ -394,6 +394,16 @@ class Circuit:
                ) -> None:
         ...
 
+    @overload
+    def append(op: Operation
+               ) -> None:
+        ...
+
+    @overload
+    def append(ann: Annotation
+               ) -> None:
+        ...
+
     def append(self,
                *args,
                time=None,
@@ -405,8 +415,8 @@ class Circuit:
         ----------
         name : str
             Name of operation.
-        control and target : int or tuple
-            The address of any control or target qubits.
+        targets : int or tuple
+            The addresses of any target qubits.
         time : int or [1] or None, optional
             The time at which to append the operation. The default is None.
         params : float or list[float]
@@ -470,6 +480,7 @@ class Circuit:
                 ann = Annotation(name)
                 ins_type = 1
 
+        # if needed add timepoints to circuit
         if time is None:
             while self._cur_time >= len(self.instructions):
                 self._append_tp()
@@ -481,7 +492,6 @@ class Circuit:
             else:
                 self.annotations[self.cur_time+1].append(ann)
                 if ann.name == 'TICK':
-                    # self._append_tp()
                     self.cur_time += 1
             return
 
@@ -510,6 +520,79 @@ class Circuit:
 
         else:
             self._apply_encoded_operation(op, time=time)
+
+    def geo_append(self,
+                   *args,
+                   time=None):
+        """
+        Append a new operation to the circuit, but using coordinates of qubits.
+
+        Parameters
+        ----------
+        name : str
+            Name of operation.
+        targets : int or tuple
+            The addresses of any target qubits.
+        time : int or [1] or None, optional
+            The time at which to append the operation. The default is None.
+        params : float or list[float]
+            If the gate is parameterized, this must be equal to the number of
+            params passed.
+
+        Raises
+        ------
+        Exception
+            If Operation not valid, or cannot be appened.
+
+        """
+        if not self.layout_map:
+            self.map_to_physical_layout()
+
+        if type(args[0]) is not str:
+            raise Exception('Operation name must be str.')
+        name = args[0].upper()
+
+        # first do some type checking
+        op_info = _operations.get(name, False)
+        N = op_info["num_targets"]
+        if not op_info:
+            raise Exception('Not a known operation.')
+        elif len(args) != N + 1 + op_info["is_parameterized"]:
+            s = f'{name} takes {N} targets.'
+            if op_info["is_parameterized"]:
+                s += f' And a {op_info["num_parameters"]} parameter list.'
+            raise Exception(s)
+        elif any(not isinstance(t, (int, tuple)) for t in args[1:N+1]):
+            raise Exception('Target is not an int or tuple.')
+        elif op_info['is_parameterized']:
+            if (op_info['num_parameters'] == 1
+                    and type(args[-1]) is not float):
+                raise Exception('parameter must be a float.')
+            elif op_info['num_parameters'] > 1:
+                if (type(args[-1]) is not list
+                        or len(args[-1]) != op_info['num_parameters']):
+                    raise Exception(f'{name} needs \
+{op_info["num_parameters"]} parameters')
+
+        # now construct the operation
+        if op_info['is_parameterized']:
+            if op_info['num_parameters'] == 1:
+                parameters = [args[N+1]]
+            else:
+                parameters = args[N+1]
+        else:
+            parameters = None
+
+        if op_info['ins_type'] == 0:
+            L = len(self.base_address)
+            raw_targets = [self.layout_map.inverse[coord][L:]
+                           for coord in args[1:N+1]]
+            targets = self._standardize_addresses(raw_targets)
+            op = Operation(name, targets, parameters=parameters)
+            self.append(op)
+        else:
+            ann = Annotation(name)
+            self.append(ann)
 
     def _append_tp(self,
                    tp: Timepoint = Timepoint(),
