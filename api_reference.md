@@ -14,6 +14,7 @@
   * [cur\_time](#stac.circuit.Circuit.cur_time)
   * [cur\_time](#stac.circuit.Circuit.cur_time)
   * [append](#stac.circuit.Circuit.append)
+  * [geo\_append](#stac.circuit.Circuit.geo_append)
   * [append\_register](#stac.circuit.Circuit.append_register)
   * [map\_to\_physical\_layout](#stac.circuit.Circuit.map_to_physical_layout)
   * [num\_qubits](#stac.circuit.Circuit.num_qubits)
@@ -363,8 +364,37 @@ def append(self, *args, time=None)
     ----------
     name : str
         Name of operation.
-    control and target : int or tuple
-        The address of any control or target qubits.
+    targets : int or tuple
+        The addresses of any target qubits.
+    time : int or [1] or None, optional
+        The time at which to append the operation. The default is None.
+    params : float or list[float]
+        If the gate is parameterized, this must be equal to the number of
+        params passed.
+    
+    Raises
+    ------
+    Exception
+        If Operation not valid, or cannot be appened.
+```
+
+<a id="stac.circuit.Circuit.geo_append"></a>
+
+#### Circuit.geo\_append
+
+```python
+def geo_append(self, *args, time=None)
+```
+
+```
+    Append a new operation to the circuit, but using coordinates of qubits.
+    
+    Parameters
+    ----------
+    name : str
+        Name of operation.
+    targets : int or tuple
+        The addresses of any target qubits.
     time : int or [1] or None, optional
         The time at which to append the operation. The default is None.
     params : float or list[float]
