@@ -422,8 +422,8 @@ def map_to_physical_layout(self,
     
     Returns
     -------
-    layout_map: list[list]
-        List of the pairs [virtual qubit address, physical qubit index].
+    layout_map: bidict.bidict
+        bidict with items {virtual qubit address, physical qubit index}.
 ```
 
 <a id="stac.circuit.Circuit.num_qubits"></a>
