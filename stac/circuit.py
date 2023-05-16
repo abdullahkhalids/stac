@@ -1,6 +1,6 @@
 """Provide a module to create and manipulate quantum circuits."""
-from IPython.display import display, SVG
 from typing import Any, Iterator, Union, Optional, overload
+
 from .operation import Operation
 from .annotation import Annotation, AnnotationSlice
 from .timepoint import Timepoint
@@ -9,16 +9,17 @@ from .register import Register, QubitRegister, RegisterRegister
 from .supportedoperations import _operations
 from .instructionblock import InstructionBlock, AnnotationBlock
 
+from IPython.display import display, SVG
 from itertools import chain
 import textwrap
 import sys
-
 import svg
 import json
 import numpy as np
 from qiskit import QuantumCircuit, execute, Aer
 import stim
 import copy
+import bidict
 import tabulate
 tabulate.PRESERVE_WHITESPACE = True
 
@@ -101,6 +102,7 @@ class Circuit:
 
         self.base_address: Any = tuple()
 
+        self.physical_register = Register()
         self.layout_map = None
         self.custom_gates = ''
 
@@ -570,20 +572,18 @@ class Circuit:
 
         Returns
         -------
-        layout_map: list[list]
-            List of the pairs [virtual qubit address, physical qubit index].
+        layout_map: bidict.bidict
+            bidict with items {virtual qubit address, physical qubit index}.
         """
-        self.physical_register = Register()
-
         self.physical_register.elements = [PhysicalQubit(i, i, [])
                                            for i in range(self.num_qubits)]
 
         qa = self.register[0].qubit_addresses()
-        self.layout_map = []
+        self.layout_map = bidict.bidict()
         for i, address in enumerate(qa):
             self.register[0][address].constituent_register = \
                 self.physical_register.elements[i]
-            self.layout_map.append([(0,) + address, i])
+            self.layout_map[(0,) + address] = i
 
         return self.layout_map
 
@@ -860,17 +860,17 @@ class Circuit:
         validops = {'H', 'X', 'Y', 'Z', 'CX', 'CY', 'CZ'}
         cols = []
 
-        lm_dict = dict()
-        for item in self.layout_map:
-            lm_dict[item[0]] = item[1]
+        if not self.layout_map:
+            self.map_to_physical_layout()
+
         for op in self:
             if op.name in validops:
                 L = [1 for i in range(self.num_qubits)]
-                t0 = lm_dict[op.targets[0]]
+                t0 = self.layout_map[op.targets[0]]
                 if op.num_affected_qubits == 1:
                     L[t0] = op.name
                 else:
-                    t1 = lm_dict[op.targets[1]]
+                    t1 = self.layout_map[op.targets[1]]
                     L[t0] = "•"
                     L[t1] = op.name[1]
 
@@ -1019,16 +1019,17 @@ class Circuit:
             self.map_to_physical_layout()
 
         num_qubits = self.num_qubits
-        lm = self.layout_map.copy()
-        lm.sort(key=lambda x: x[1])
-        address_label_len = max(map(len, map(lambda x: str(x[0]), lm)))
+        # lm = self.layout_map.copy()
+        # lm.sort(key=lambda x: x[1])
+        lm = self.layout_map
+        address_label_len = max(map(len, map(lambda x: str(x), lm)))
         index_label_len = len(str(num_qubits))
         label_len = address_label_len + index_label_len+3
-        circ_disp = [[str(lm[i][0]).ljust(address_label_len)
+        circ_disp = [[str(address).ljust(address_label_len)
                      + ' : '
-                     + str(lm[i][1]).rjust(index_label_len)
+                     + str(index).rjust(index_label_len)
                      + space]
-                     for i in range(num_qubits)]
+                     for address, index in lm.items()]
         circ_disp2 = [list(space*(label_len+1))
                       for _ in range(num_qubits)]
 
@@ -1153,17 +1154,16 @@ class Circuit:
         wirey = [y_shift + i*46 for i in range(self.num_qubits)]
 
         num_qubits = self.num_qubits
-        lm = self.layout_map.copy()
-        lm.sort(key=lambda x: x[1])
-        address_label_len = max(map(len, map(lambda x: str(x[0]), lm)))
+        lm = self.layout_map
+        address_label_len = max(map(len, map(lambda x: str(x), lm)))
         index_label_len = len(str(num_qubits))
         nbspace = '&#160;'
-        labels = [str(lm[i][0])
-                  + nbspace*(address_label_len-len(str(lm[i][0]))+1)
+        labels = [str(address)
+                  + nbspace*(address_label_len-len(str(address))+1)
                   + ':'
-                  + nbspace*(index_label_len-len(str(lm[i][1]))+1)
-                  + str(lm[i][1])
-                  for i in range(num_qubits)]
+                  + nbspace*(index_label_len-len(str(index))+1)
+                  + str(index)
+                  for address, index in lm.items()]
         x0 = (address_label_len+index_label_len+3)*8
 
         # add labels
