@@ -101,7 +101,7 @@ class Circuit:
 
         self.base_address: Any = tuple()
 
-        self._layout_map = None
+        self.layout_map = None
         self.custom_gates = ''
 
     @staticmethod
@@ -575,18 +575,17 @@ class Circuit:
         """
         self.physical_register = Register()
 
-        # x = list(range(self.num_qubits))
         self.physical_register.elements = [PhysicalQubit(i, i, [])
                                            for i in range(self.num_qubits)]
 
         qa = self.register[0].qubit_addresses()
-        self._layout_map = []
+        self.layout_map = []
         for i, address in enumerate(qa):
             self.register[0][address].constituent_register = \
                 self.physical_register.elements[i]
-            self._layout_map.append([(0,) + address, i])
+            self.layout_map.append([(0,) + address, i])
 
-        return self._layout_map
+        return self.layout_map
 
     def _structure(self,
                    depth: int = -1,
@@ -787,7 +786,7 @@ class Circuit:
             The qasm string of the circuit.
 
         """
-        if not self._layout_map:
+        if not self.layout_map:
             self.map_to_physical_layout()
         qasm_str = ''
 
@@ -826,7 +825,7 @@ class Circuit:
             A string suitable for importing by stim.
 
         """
-        if not self._layout_map:
+        if not self.layout_map:
             self.map_to_physical_layout()
         stim_str = ''
 
@@ -862,7 +861,7 @@ class Circuit:
         cols = []
 
         lm_dict = dict()
-        for item in self._layout_map:
+        for item in self.layout_map:
             lm_dict[item[0]] = item[1]
         for op in self:
             if op.name in validops:
@@ -1016,11 +1015,11 @@ class Circuit:
         space = ' '
         vert = '│'
 
-        if not self._layout_map:
+        if not self.layout_map:
             self.map_to_physical_layout()
 
         num_qubits = self.num_qubits
-        lm = self._layout_map.copy()
+        lm = self.layout_map.copy()
         lm.sort(key=lambda x: x[1])
         address_label_len = max(map(len, map(lambda x: str(x[0]), lm)))
         index_label_len = len(str(num_qubits))
@@ -1140,7 +1139,7 @@ class Circuit:
             If True, each timepoint is highlighted. The default is False.
 
         """
-        if not self._layout_map:
+        if not self.layout_map:
             self.map_to_physical_layout()
 
         y_shift = 20
@@ -1154,7 +1153,7 @@ class Circuit:
         wirey = [y_shift + i*46 for i in range(self.num_qubits)]
 
         num_qubits = self.num_qubits
-        lm = self._layout_map.copy()
+        lm = self.layout_map.copy()
         lm.sort(key=lambda x: x[1])
         address_label_len = max(map(len, map(lambda x: str(x[0]), lm)))
         index_label_len = len(str(num_qubits))
