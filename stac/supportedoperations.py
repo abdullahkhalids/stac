@@ -66,4 +66,3 @@ for name in ['TICK']:
         'num_targets': 0,
         }
 _operations['TICK']['qasm_str'] = 'barrier q;\n'
-

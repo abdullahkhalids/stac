@@ -210,7 +210,7 @@ subregister or qubit at {s}.'
             s = ' '*indent
             s += ' '.join([str(register.index),
                            register.register_type,
-                           'x',
+                           '×',
                            str(len(register)),
                            '\n'])
             if type(register) is not QubitRegister:
