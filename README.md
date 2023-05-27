@@ -18,6 +18,19 @@ number of useful functions. You can
 * The above can be harnessed to study the effects of errors on circuits.
 * circuits can be exported to qasm, stim or quirk style circuits.
 
+## Getting started
+To install stac, run
+
+```
+pip install git+https://github.com/abdullahkhalids/stac
+```
+
+Please refer to my [mini-book](https://abdullahkhalid.com/qecft/index.html) which
+illustrate usage in action.
+
+A short guide on Stac circuits is available 
+[here](https://github.com/abdullahkhalids/stac/wiki/guide).
+
 ## Development version
 Stac is currently undergoing a complete overwrite to make it suitable for
 constructing fault-tolerant circuits. The goals and progress
@@ -37,11 +50,8 @@ constructing fault-tolerant circuits. The goals and progress
 Documentation will be made available once the developmental version is ready
 to be merged into `main`. 
 
-## Getting started
-Please refer to my [mini-book](https://abdullahkhalid.com/qecft/introduction/stac/) which
-illustrate installation and usage.
+
 
 ## Credits
-
 Thanks for Unitary Fund for funding part of the development of this project.
 [![Unitary Fund](https://img.shields.io/badge/Supported%20By-UNITARY%20FUND-brightgreen.svg?style=for-the-badge)](https://unitary.fund)
