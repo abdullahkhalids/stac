@@ -1365,6 +1365,7 @@ class Circuit:
 
         el = [svg.Style(
             text="""
+            svg {background-color:white;}
             .labeltext { font-family: Bitstream Vera Sans Mono;
                         font-size: 12px; font-weight: 400; fill: black;}
             .qubitline { stroke: black; stroke-width: 2; }
