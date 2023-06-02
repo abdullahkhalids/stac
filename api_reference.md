@@ -48,6 +48,7 @@
   * [\_\_repr\_\_](#stac.operation.Operation.__repr__)
   * [\_\_str\_\_](#stac.operation.Operation.__str__)
   * [\_\_eq\_\_](#stac.operation.Operation.__eq__)
+  * [\_\_hash\_\_](#stac.operation.Operation.__hash__)
   * [copy](#stac.operation.Operation.copy)
   * [rebase\_qubits](#stac.operation.Operation.rebase_qubits)
 * [Instruction](#stac.instruction.Instruction)
@@ -1000,6 +1001,18 @@ def __eq__(self, other: 'Operation') -> bool
 
 ```
     Determine if two operations are equal.
+```
+
+<a id="stac.operation.Operation.__hash__"></a>
+
+#### Operation.\_\_hash\_\_
+
+```python
+def __hash__(self) -> int
+```
+
+```
+    Return a hash of the object.
 ```
 
 <a id="stac.operation.Operation.copy"></a>
