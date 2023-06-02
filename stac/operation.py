@@ -77,6 +77,10 @@ class Operation(Instruction):
                     return False
         return True
 
+    def __hash__(self) -> int:
+        """Return a hash of the object."""
+        return hash(repr(self))
+
     def copy(self) -> 'Operation':
         """Return copy of class."""
         copied_op = Operation.__new__(Operation)
