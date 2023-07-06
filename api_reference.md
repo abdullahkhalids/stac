@@ -98,6 +98,7 @@
   * [construct\_encoding\_circuit](#stac.code.Code.construct_encoding_circuit)
   * [construct\_decoding\_circuit](#stac.code.Code.construct_decoding_circuit)
   * [construct\_syndrome\_circuit](#stac.code.Code.construct_syndrome_circuit)
+  * [construct\_encoded\_qubit](#stac.code.Code.construct_encoded_qubit)
 * [InstructionBlock](#stac.instructionblock.InstructionBlock)
   * [\_\_repr\_\_](#stac.instructionblock.InstructionBlock.__repr__)
   * [\_\_str\_\_](#stac.instructionblock.InstructionBlock.__str__)
@@ -578,11 +579,16 @@ def qasm(self) -> str
 #### Circuit.stim
 
 ```python
-def stim(self) -> str
+def stim(self, clean: bool = False) -> str
 ```
 
 ```
     Convert circuit to a string that can be imported by stim.
+    
+    Parameters
+    ----------
+    clean : bool
+        If True, then pass it through stim to compactify it.
     
     Returns
     -------
@@ -1939,8 +1945,8 @@ def construct_decoding_circuit(self) -> Circuit
 
 ```python
 def construct_syndrome_circuit(self,
-                               syndrome_measurement_type: str = 'non_ft'
-                               ) -> Circuit
+                               syndrome_measurement_type: str = 'non_ft',
+                               assign_circuit: bool = True) -> Circuit
 ```
 
 ```
@@ -1954,11 +1960,46 @@ def construct_syndrome_circuit(self,
                     'cat_standard'.
         With the 'standard' postfix uses the standard form of the
         generators. If no argument, then 'non_ft' is Default.
+    assign_circuit : bool, optional
+        If true, the circuit is assigned to self.syndrome_circuit. The
+        default is True.
     
     Returns
     -------
     syndrome_circuit : Circuit
         The circuit for measuring the stabilizers.
+```
+
+<a id="stac.code.Code.construct_encoded_qubit"></a>
+
+#### Code.construct\_encoded\_qubit
+
+```python
+def construct_encoded_qubit(self,
+                            J: int,
+                            syndrome_measurement_type: str = 'non_ft'
+                            ) -> Circuit
+```
+
+```
+    Create an encoded qubit at the Jth concatenation level.
+    
+    Parameters
+    ----------
+    J : int
+        Concatenation level.
+    syndrome_measurement_type : str, optional
+        Options are 'non_ft',
+                    'non_ft_standard',
+                    'cat',
+                    'cat_standard'.
+        With the 'standard' postfix uses the standard form of the
+        generators. If no argument, then 'non_ft' is Default.
+    
+    Returns
+    -------
+    Circuit
+        DESCRIPTION.
 ```
 
 <a id="stac.instructionblock.InstructionBlock"></a>
