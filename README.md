@@ -1,22 +1,30 @@
 # stac
-Stac allows you to generate and simulate quantum stabilizer codes. If you give
-it a generator matrix, it will generate a code. You can then,
+Stac allows you to generate and simulate quantum stabilizer codes. It comes with
+its own quantum circuit library that has been designed to make the process of
+algorithmically creating quantum error-correction circuits and fault-tolerence
+circuits as painless as possible. 
 
-* check if the code is valid
-* convert to the standard form of the generator matrix
-* generate an encoding circuit
-* generate a decoding circuit
-* generate syndrome measurment circuit
+Stac also includes a stabilizer code library. If you give it a generator matrix
+of any stabilizer code, you construct a code object. Code objects include 
+algorithms for generating
 
-All circuits are built using the provided Circuit class. Circuits have a
-number of useful functions. You can
+* encoding circuits,
+* decoding circuits,
+* syndrome measurment circuits,
+
+for the code, among other useful functions.
+
+For these circuits or any other circuits you build using the circuit library,
+you can
 
 * draw the circuits.
 * annotate the circuit with errors. This is useful for reasoning about how
   errors effect the circuits of quantum codes.
 * simulate circuits using either Qiskit or Stim.
-* The above can be harnessed to study the effects of errors on circuits.
-* circuits can be exported to qasm, stim or quirk style circuits.
+* export to qasm, stim or quirk.
+
+One of the goals of stac (not there yet) is to compute the fault-tolerance
+thresholds of any stabilizer code in "one-click".
 
 ## Getting started
 To install stac, run
@@ -26,9 +34,9 @@ pip install git+https://github.com/abdullahkhalids/stac
 ```
 
 Please refer to my [mini-book](https://abdullahkhalid.com/qecft/index.html) which
-illustrate usage in action.
+illustrates basic usage in action.
 
-A short guide on Stac circuits is available 
+A short guide on more advanced Stac circuits is available 
 [here](https://github.com/abdullahkhalids/stac/wiki/guide).
 
 ## Development version
@@ -46,10 +54,6 @@ constructing fault-tolerant circuits. The goals and progress
       fault-tolerant circuits (basic functionality present but needs improvement)
 * [ ] Export a stim circuit that can be used to compute the threshold of the 
       code.
-
-Documentation will be made available once the developmental version is ready
-to be merged into `main`. 
-
 
 
 ## Credits
