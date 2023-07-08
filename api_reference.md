@@ -1882,13 +1882,17 @@ def construct_standard_form(self) -> (Any, Any, int)
 #### Code.construct\_logical\_operators
 
 ```python
-def construct_logical_operators(self) -> (Any, Any)
+def construct_logical_operators(self, method: str = "gottesman") -> (Any, Any)
 ```
 
 ```
     Construct logical operators for the code.
     
-    Uses Gottesman's method for doing this.
+    Parameters
+    ----------
+    method : str
+        Method to construct logical operators. Uses Gottesman's method by
+        default.
     
     Returns
     -------
