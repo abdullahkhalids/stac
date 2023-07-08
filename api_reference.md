@@ -51,6 +51,10 @@
   * [\_\_hash\_\_](#stac.operation.Operation.__hash__)
   * [copy](#stac.operation.Operation.copy)
   * [rebase\_qubits](#stac.operation.Operation.rebase_qubits)
+* [hexagon\_coordinates](#stac.colorcode.hexagon_coordinates)
+* [create\_hexagon\_svg](#stac.colorcode.create_hexagon_svg)
+* [ColorCode](#stac.colorcode.ColorCode)
+  * [\_\_init\_\_](#stac.colorcode.ColorCode.__init__)
 * [Instruction](#stac.instruction.Instruction)
 * [Register](#stac.register.Register)
   * [\_\_init\_\_](#stac.register.Register.__init__)
@@ -1057,6 +1061,110 @@ def rebase_qubits(self, new_base: tuple) -> 'Operation'
         A new Operation with new base address.
 ```
 
+<a id="stac.colorcode.hexagon_coordinates"></a>
+
+#### hexagon\_coordinates
+
+```python
+def hexagon_coordinates(x0: float,
+                        y0: float,
+                        size: int = 25,
+                        included: str = 'full') -> list[tuple[float, float]]
+```
+
+```
+    Determine the coordinates of the vertices of a hexagon.
+    
+    The hexagon is oriented so there are horizontal sides on the top and
+    bottom.
+    
+    Parameters
+    ----------
+    x0 : float
+        Horizontal position of center.
+    y0 : float
+        Vertical position of center.
+    size : int, optional
+        The radius of a circuit touching the vertices of the hexagon. The
+        default is 25.
+    included : str, optional
+        Which vertices to include in the output. The options are full, top,
+        bottom, left and right. The default is 'full'.
+    
+    Returns
+    -------
+    list(tuple(float))
+        A list of (x,y) coordinates. Go clockwise from the right-most vertex.
+```
+
+<a id="stac.colorcode.create_hexagon_svg"></a>
+
+#### create\_hexagon\_svg
+
+```python
+def create_hexagon_svg(x0: float,
+                       y0: float,
+                       color: str,
+                       size: int = 25,
+                       included: str = 'full')
+```
+
+```
+    Create an svg.Polygon object of a hexagon.
+    
+    Parameters
+    ----------
+    x0 : float
+        Horizontal position of center.
+    y0 : float
+        Vertical position of center.
+    color : str
+        Options are r, g or b.
+    size : int, optional
+        The radius of a circuit touching the vertices of the hexagon. The
+        default is 25.
+    included : str, optional
+        Which vertices to include in the output. The options are full, top,
+        bottom, left and right. The default is 'full'.
+    
+    Returns
+    -------
+    pg : svg.Polygon
+        The svg.Polygon object of the hexagon.
+```
+
+<a id="stac.colorcode.ColorCode"></a>
+
+## ColorCode
+
+```python
+class ColorCode(Code)
+```
+
+```
+    Class for creating color codes.
+```
+
+<a id="stac.colorcode.ColorCode.__init__"></a>
+
+#### ColorCode.\_\_init\_\_
+
+```python
+def __init__(self, distance: int, geometry: str = "hexagonal") -> None
+```
+
+```
+    Construct the color code of some geometry and distance.
+    
+    Parameters
+    ----------
+    distance : int
+        The distance of the code.
+    geometry : str, optional
+        Describes the shape of the primal lattice. The default and only
+        option currently is "hexagonal".
+```
+
 <a id="stac.instruction.Instruction"></a>
 
 ## Instruction
@@ -1679,7 +1787,7 @@ def __init__(self, *args: Any) -> None
     generators_x : numpy.array
     generators_z : numpy.array
         Pass two matrices of the same shape, that describe the X part and
-        the Z art of the code.
+        the Z part of the code.
 ```
 
 <a id="stac.code.Code.__repr__"></a>
