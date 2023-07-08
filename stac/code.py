@@ -411,11 +411,17 @@ class Code:
             self.standard_generators_z,\
             self.rankx
 
-    def construct_logical_operators(self) -> (Any, Any):
+    def construct_logical_operators(self,
+                                    method: str = "gottesman"
+                                    ) -> (Any, Any):
         """
         Construct logical operators for the code.
 
-        Uses Gottesman's method for doing this.
+        Parameters
+        ----------
+        method : str
+            Method to construct logical operators. Uses Gottesman's method by
+            default.
 
         Returns
         -------
@@ -424,6 +430,8 @@ class Code:
         logical_zs: numpy.array
             Array of logical xs. Each row is an operator.
         """
+        if method == "gottesman":
+            raise Exception("Only method=gottesman is supported.")
         if self.standard_generators_x is None:
             self.construct_standard_form()
 
