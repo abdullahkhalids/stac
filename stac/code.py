@@ -260,7 +260,7 @@ class Code:
         generators_x : numpy.array
         generators_z : numpy.array
             Pass two matrices of the same shape, that describe the X part and
-            the Z art of the code.
+            the Z part of the code.
 
         """
         if len(args) == 1:
@@ -479,6 +479,15 @@ class Code:
         for i in range(n):
             circ.append('H', (0, 0, 0, i))
         self.logical_circuits['H'] = circ
+
+        circ = Circuit()
+        circ.append_register(
+            self.construct_encoded_qubit_register(
+                0, syndrome_measurement_type))
+        circ.append("H", (0, 0, 0, 0))
+        for i in range(6):
+            circ.append("CX", (0, 0, 0, i), (0, 0, 0, i+1))
+        self.logical_circuits['CAT'] = circ
 
         for name in ['M', 'R', 'MR']:
             circ = Circuit()
@@ -775,7 +784,8 @@ class Code:
         return self.decoding_circuit
 
     def construct_syndrome_circuit(self,
-                                   syndrome_measurement_type: str = 'non_ft'
+                                   syndrome_measurement_type: str = 'non_ft',
+                                   assign_circuit: bool = True
                                    ) -> Circuit:
         """
         Construct a circuit to measure the stabilizers of the code.
@@ -788,6 +798,9 @@ class Code:
                         'cat_standard'.
             With the 'standard' postfix uses the standard form of the
             generators. If no argument, then 'non_ft' is Default.
+        assign_circuit : bool, optional
+            If true, the circuit is assigned to self.syndrome_circuit. The
+            default is True.
 
         Returns
         -------
@@ -796,30 +809,33 @@ class Code:
 
         """
         if syndrome_measurement_type == 'non_ft':
-            self.syndrome_circuit = \
+            syndrome_circuit = \
                 self._construct_syndrome_circuit_simple(self.generators_x,
                                                         self.generators_z)
         elif syndrome_measurement_type == 'non_ft_standard':
             if self.standard_generators_x is None:
                 self.construct_standard_form()
-            self.syndrome_circuit = \
+            syndrome_circuit = \
                 self._construct_syndrome_circuit_simple(
                     self.standard_generators_x,
                     self.standard_generators_z)
 
         elif syndrome_measurement_type == 'cat':
-            self.syndrome_circuit = \
+            syndrome_circuit = \
                 self._construct_syndrome_circuit_cat(self.generators_x,
                                                      self.generators_z)
         elif syndrome_measurement_type == 'cat_standard':
             if self.standard_generators_x is None:
                 self.construct_standard_form()
-            self.syndrome_circuit = \
+            syndrome_circuit = \
                 self._construct_syndrome_circuit_cat(
                     self.standard_generators_x,
                     self.standard_generators_z)
 
-        return self.syndrome_circuit
+        if assign_circuit:
+            self.syndrome_circuit = syndrome_circuit
+
+        return syndrome_circuit
 
     def _construct_syndrome_circuit_simple(self,
                                            generators_x: Any,
@@ -840,39 +856,39 @@ class Code:
             The syndrome circuit.
 
         """
-        self.syndrome_circuit = Circuit()
+        syndrome_circuit = Circuit()
         rg = self.construct_encoded_qubit_register(0, 'non_ft')
-        self.syndrome_circuit.append_register(rg)
+        syndrome_circuit.append_register(rg)
 
         for i in range(self.num_generators):
-            self.syndrome_circuit.append("H", (0, 0, 1, i, 0))
+            syndrome_circuit.append("H", (0, 0, 1, i, 0))
 
         for i in range(self.num_generators):
             for j in range(self.num_physical_qubits):
                 if generators_x[i, j] and generators_z[i, j]:
-                    self.syndrome_circuit.append("CX",
-                                                 (0, 0, 1, i, 0),
-                                                 (0, 0, 0, j))
-                    self.syndrome_circuit.append("CZ",
-                                                 (0, 0, 1, i, 0),
-                                                 (0, 0, 0, j))
+                    syndrome_circuit.append("CX",
+                                            (0, 0, 1, i, 0),
+                                            (0, 0, 0, j))
+                    syndrome_circuit.append("CZ",
+                                            (0, 0, 1, i, 0),
+                                            (0, 0, 0, j))
                 elif generators_x[i, j]:
-                    self.syndrome_circuit.append("CX",
-                                                 (0, 0, 1, i, 0),
-                                                 (0, 0, 0, j))
+                    syndrome_circuit.append("CX",
+                                            (0, 0, 1, i, 0),
+                                            (0, 0, 0, j))
                 elif generators_z[i, j]:
-                    self.syndrome_circuit.append("CZ",
-                                                 (0, 0, 1, i, 0),
-                                                 (0, 0, 0, j))
-            self.syndrome_circuit.cur_time += 1
+                    syndrome_circuit.append("CZ",
+                                            (0, 0, 1, i, 0),
+                                            (0, 0, 0, j))
+            syndrome_circuit.cur_time += 1
 
         for i in range(0, self.num_generators):
-            self.syndrome_circuit.append("H", (0, 0, 1, i, 0))
+            syndrome_circuit.append("H", (0, 0, 1, i, 0))
 
         for i in range(0, self.num_generators):
-            self.syndrome_circuit.append('MR', (0, 0, 1, i, 0))
+            syndrome_circuit.append('MR', (0, 0, 1, i, 0))
 
-        return self.syndrome_circuit
+        return syndrome_circuit
 
     def _construct_syndrome_circuit_cat(self,
                                         generators_x: Any,
@@ -893,63 +909,95 @@ class Code:
             The syndrome circuit.
 
         """
-        self.syndrome_circuit = Circuit()
+        syndrome_circuit = Circuit()
         rg = self.construct_encoded_qubit_register(0, 'cat')
-        self.syndrome_circuit.append_register(rg)
+        syndrome_circuit.append_register(rg)
 
+        # create cat state check
         for i in range(self.num_generators):
-            self.syndrome_circuit.cur_time = 0
-            self.syndrome_circuit.append('H',  (0, 0, 1, i, 0, 0))
-            ng = self.syndrome_circuit.register[0, 0, 1, i, 0].num_qubits
+            syndrome_circuit.cur_time = 0
+            syndrome_circuit.append('H',  (0, 0, 1, i, 0, 0))
+            ng = syndrome_circuit.register[0, 0, 1, i, 0].num_qubits
             for j in range(ng-1):
-                self.syndrome_circuit.append(
+                syndrome_circuit.append(
                     'CX', (0, 0, 1, i, 0, j), (0, 0, 1, i, 0, j+1))
-            self.syndrome_circuit.append(
+            syndrome_circuit.append(
                 'CX', (0, 0, 1, i, 0, 0), (0, 0, 1, i, 1, 0))
-            self.syndrome_circuit.append(
+            syndrome_circuit.append(
                 'CX', (0, 0, 1, i, 0, ng-1), (0, 0, 1, i, 1, 0))
-            # self.syndrome_circuit.append('MR', (0, 0, 1, i, 1, 0))
+            syndrome_circuit.append('MR', (0, 0, 1, i, 1, 0))
 
-        self.syndrome_circuit.cur_time += 1
+        syndrome_circuit.cur_time += 1
 
+        # measure each generator
         for i in range(self.num_generators):
             k = 0
             for j in range(self.num_physical_qubits):
                 if generators_x[i, j] and generators_z[i, j]:
-                    self.syndrome_circuit.append("CX",
-                                                 (0, 0, 1, i, 0, k),
-                                                 (0, 0, 0, j))
-                    self.syndrome_circuit.append("CZ",
-                                                 (0, 0, 1, i, 0, k),
-                                                 (0, 0, 0, j))
+                    syndrome_circuit.append("CX",
+                                            (0, 0, 1, i, 0, k),
+                                            (0, 0, 0, j))
+                    syndrome_circuit.append("CZ",
+                                            (0, 0, 1, i, 0, k),
+                                            (0, 0, 0, j))
                     k += 1
                 elif generators_x[i, j]:
-                    self.syndrome_circuit.append("CX",
-                                                 (0, 0, 1, i, 0, k),
-                                                 (0, 0, 0, j))
+                    syndrome_circuit.append("CX",
+                                            (0, 0, 1, i, 0, k),
+                                            (0, 0, 0, j))
                     k += 1
                 elif generators_z[i, j]:
-                    self.syndrome_circuit.append("CZ",
-                                                 (0, 0, 1, i, 0, k),
-                                                 (0, 0, 0, j))
+                    syndrome_circuit.append("CZ",
+                                            (0, 0, 1, i, 0, k),
+                                            (0, 0, 0, j))
                     k += 1
-            self.syndrome_circuit.cur_time += 1
+            syndrome_circuit.cur_time += 1
 
-        w = len(self.syndrome_circuit.timepoints)-1
+        w = len(syndrome_circuit.instructions)-1
         for i in range(self.num_generators):
-            self.syndrome_circuit.cur_time = w
-            ng = self.syndrome_circuit.register[0, 0, 1, i, 0].num_qubits
+            syndrome_circuit.cur_time = w
+            ng = syndrome_circuit.register[0, 0, 1, i, 0].num_qubits
             for j in range(ng-1-1, -1, -1):
-                self.syndrome_circuit.append(
+                syndrome_circuit.append(
                     'CX', (0, 0, 1, i, 0, j), (0, 0, 1, i, 0, j+1))
-            self.syndrome_circuit.append('H',  (0, 0, 1, i, 0, 0))
-            self.syndrome_circuit.append('MR', (0, 0, 1, i, 0, 0))
+            syndrome_circuit.append('H',  (0, 0, 1, i, 0, 0))
+            syndrome_circuit.append('MR', (0, 0, 1, i, 0, 0))
 
-        return self.syndrome_circuit
+        return syndrome_circuit
 
-    def construct_encoded_qubit(self, J, syndrome_measurement_type='non_ft'):
+    def construct_encoded_qubit(self,
+                                J: int,
+                                syndrome_measurement_type: str = 'non_ft'
+                                ) -> Circuit:
+        """
+        Create an encoded qubit at the Jth concatenation level.
 
-        self.construct_syndrome_circuit(syndrome_measurement_type)
+        Parameters
+        ----------
+        J : int
+            Concatenation level.
+        syndrome_measurement_type : str, optional
+            Options are 'non_ft',
+                        'non_ft_standard',
+                        'cat',
+                        'cat_standard'.
+            With the 'standard' postfix uses the standard form of the
+            generators. If no argument, then 'non_ft' is Default.
+
+        Returns
+        -------
+        Circuit
+            DESCRIPTION.
+
+        """
+        self.construct_logical_gate_circuits()
+
+        syndcirc = self.construct_syndrome_circuit(syndrome_measurement_type,
+                                                   assign_circuit=False)
+        for tp in syndcirc.instructions:
+            for op in tp:
+                if op.name == 'H':
+                    op.name = 'CAT'
         circ = Circuit()
 
         # add one qubit at level J
@@ -963,19 +1011,23 @@ class Code:
             for paddress in prev_addresses:
                 for qubit in circ.register[paddress].qubits('l'):
                     address = circ.append_register(
-                        self.construct_encoded_qubit_register(j, syndrome_measurement_type))
+                        self.construct_encoded_qubit_register(
+                            j, syndrome_measurement_type))
                     qubit.constituent_register = address
                     qubit.index_in_constituent_register = 0
                     next_addresses.append(address)
                 for qubit in circ.register[paddress].qubits('d'):
                     address = circ.append_register(
-                        self.construct_encoded_qubit_register(j, syndrome_measurement_type))
+                        self.construct_encoded_qubit_register(
+                            j, syndrome_measurement_type))
                     qubit.constituent_register = address
                     qubit.index_in_constituent_register = 0
                     next_addresses.append(address)
                 for qubit in circ.register[paddress].qubits('s'):
                     sreg = RegisterRegister(
-                        's', j, QubitRegister('g', j, self.num_physical_qubits))
+                        's',
+                        j,
+                        QubitRegister('g', j, self.num_physical_qubits))
                     sreg.code = self
                     address = circ.append_register(sreg)
                     qubit.constituent_register = address
@@ -983,13 +1035,13 @@ class Code:
                     next_addresses.append(address)
 
         for j in range(0, J):
-            w = len(circ.timepoints)
+            w = len(circ.instructions)
 
             for reg in circ.register[j]:
                 if reg.register_type != 'e':
                     continue
                 circ.cur_time = w
-                for tp in self.syndrome_circuit.instructions:
+                for tp in syndcirc.instructions:
                     for op in tp:
                         circ.append(op.rebase_qubits((reg.level, reg.index)))
                     circ.cur_time += 1
