@@ -344,6 +344,29 @@ class Code:
 
         return is_valid
 
+    def check_in_normalizer(self,
+                            operator: Any
+                            ) -> bool:
+        """
+        Check if an operator is in the normalizer of the stabilizer code.
+
+        Checks if the operator commutes with every generator.
+
+        Parameters
+        ----------
+        operator : numpy.array
+            A 2n length numpy array of of the operator.
+
+        Returns
+        -------
+        bool
+            True if operator in normalizer, else False.
+        """
+        for s in self.generator_matrix:
+            if _inner_product(s, operator):
+                return False
+        return True
+
     def construct_standard_form(self) -> (Any, Any, int):
         """
         Construct the standard form a stabilizer matrix.
