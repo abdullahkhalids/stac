@@ -433,6 +433,32 @@ class Code:
 
         return self.logical_xs, self.logical_zs
 
+    def _equivalent_operators(self,
+                              operator: Any
+                              ) -> Any:
+        """
+        Given operator, return generator of all equivalent ones.
+
+        Equivalence is defined upto multiplication by stabilizers.
+
+        Parameters
+        ----------
+        operator : Any
+            Operator to find equivalences of.
+
+        Yields
+        ------
+        Any
+            DESCRIPTION.
+
+        """
+        m = self.num_generators
+        for i in range(0, 2**m):
+            d = np.binary_repr(i, m)
+            sel = np.array(list(d), dtype=int).astype(bool)
+            op = (np.sum(self.generator_matrix[sel, :], axis=0) + operator) % 2
+            yield op	
+
     def construct_logical_gate_circuits(
             self,
             syndrome_measurement_type: str = 'non_ft'
