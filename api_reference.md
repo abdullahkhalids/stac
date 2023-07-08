@@ -92,6 +92,7 @@
   * [\_\_repr\_\_](#stac.code.Code.__repr__)
   * [\_\_str\_\_](#stac.code.Code.__str__)
   * [check\_valid\_code](#stac.code.Code.check_valid_code)
+  * [check\_in\_normalizer](#stac.code.Code.check_in_normalizer)
   * [construct\_standard\_form](#stac.code.Code.construct_standard_form)
   * [construct\_logical\_operators](#stac.code.Code.construct_logical_operators)
   * [construct\_logical\_gate\_circuits](#stac.code.Code.construct_logical_gate_circuits)
@@ -1829,6 +1830,30 @@ def check_valid_code(self) -> bool
     -------
     bool
         True if the code generators commute, false otherwise.
+```
+
+<a id="stac.code.Code.check_in_normalizer"></a>
+
+#### Code.check\_in\_normalizer
+
+```python
+def check_in_normalizer(self, operator: Any) -> bool
+```
+
+```
+    Check if an operator is in the normalizer of the stabilizer code.
+    
+    Checks if the operator commutes with every generator.
+    
+    Parameters
+    ----------
+    operator : numpy.array
+        A 2n length numpy array of of the operator.
+    
+    Returns
+    -------
+    bool
+        True if operator in normalizer, else False.
 ```
 
 <a id="stac.code.Code.construct_standard_form"></a>
