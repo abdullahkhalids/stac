@@ -43,6 +43,11 @@
   * [append](#stac.annotation.AnnotationSlice.append)
   * [\_\_add\_\_](#stac.annotation.AnnotationSlice.__add__)
   * [\_\_iadd\_\_](#stac.annotation.AnnotationSlice.__iadd__)
+* [hexagon\_coordinates](#stac.old_colorcode.hexagon_coordinates)
+* [create\_hexagon\_svg](#stac.old_colorcode.create_hexagon_svg)
+* [ColorCode](#stac.old_colorcode.ColorCode)
+  * [\_\_init\_\_](#stac.old_colorcode.ColorCode.__init__)
+  * [construct\_logical\_operators](#stac.old_colorcode.ColorCode.construct_logical_operators)
 * [Operation](#stac.operation.Operation)
   * [\_\_init\_\_](#stac.operation.Operation.__init__)
   * [\_\_repr\_\_](#stac.operation.Operation.__repr__)
@@ -51,10 +56,9 @@
   * [\_\_hash\_\_](#stac.operation.Operation.__hash__)
   * [copy](#stac.operation.Operation.copy)
   * [rebase\_qubits](#stac.operation.Operation.rebase_qubits)
-* [hexagon\_coordinates](#stac.colorcode.hexagon_coordinates)
-* [create\_hexagon\_svg](#stac.colorcode.create_hexagon_svg)
 * [ColorCode](#stac.colorcode.ColorCode)
   * [\_\_init\_\_](#stac.colorcode.ColorCode.__init__)
+  * [construct\_logical\_operators](#stac.colorcode.ColorCode.construct_logical_operators)
 * [Instruction](#stac.instruction.Instruction)
 * [Register](#stac.register.Register)
   * [\_\_init\_\_](#stac.register.Register.__init__)
@@ -935,6 +939,144 @@ def __iadd__(self, other: 'AnnotationSlice') -> 'AnnotationSlice'
         Summed AnnotationSlice.
 ```
 
+<a id="stac.old_colorcode.hexagon_coordinates"></a>
+
+#### hexagon\_coordinates
+
+```python
+def hexagon_coordinates(x0: float,
+                        y0: float,
+                        size: int = 25,
+                        included: str = 'full') -> list[tuple[float, float]]
+```
+
+```
+    Determine the coordinates of the vertices of a hexagon.
+    
+    The hexagon is oriented so there are horizontal sides on the top and
+    bottom.
+    
+    Parameters
+    ----------
+    x0 : float
+        Horizontal position of center.
+    y0 : float
+        Vertical position of center.
+    size : int, optional
+        The radius of a circuit touching the vertices of the hexagon. The
+        default is 25.
+    included : str, optional
+        Which vertices to include in the output. The options are full, top,
+        bottom, left and right. The default is 'full'.
+    
+    Returns
+    -------
+    list(tuple(float))
+        A list of (x,y) coordinates. Go clockwise from the right-most vertex.
+```
+
+<a id="stac.old_colorcode.create_hexagon_svg"></a>
+
+#### create\_hexagon\_svg
+
+```python
+def create_hexagon_svg(x0: float,
+                       y0: float,
+                       color: str,
+                       size: int = 25,
+                       included: str = 'full')
+```
+
+```
+    Create an svg.Polygon object of a hexagon.
+    
+    Parameters
+    ----------
+    x0 : float
+        Horizontal position of center.
+    y0 : float
+        Vertical position of center.
+    color : str
+        Options are r, g or b.
+    size : int, optional
+        The radius of a circuit touching the vertices of the hexagon. The
+        default is 25.
+    included : str, optional
+        Which vertices to include in the output. The options are full, top,
+        bottom, left and right. The default is 'full'.
+    
+    Returns
+    -------
+    pg : svg.Polygon
+        The svg.Polygon object of the hexagon.
+```
+
+<a id="stac.old_colorcode.ColorCode"></a>
+
+## ColorCode
+
+```python
+class ColorCode(Code)
+```
+
+```
+    Class for creating color codes.
+```
+
+<a id="stac.old_colorcode.ColorCode.__init__"></a>
+
+#### ColorCode.\_\_init\_\_
+
+```python
+def __init__(self,
+             distance: int,
+             geometry: str = "hexagonal",
+             color_order: list[str] = ['g', 'r', 'b']) -> None
+```
+
+```
+    Construct the color code of some geometry and distance.
+    
+    Parameters
+    ----------
+    distance : int
+        The distance of the code.
+    geometry : str, optional
+        Describes the shape of the primal lattice. The default and only
+        option currently is "hexagonal".
+    color_order: str, optional
+        Order of colors in the lattice.
+```
+
+<a id="stac.old_colorcode.ColorCode.construct_logical_operators"></a>
+
+#### ColorCode.construct\_logical\_operators
+
+```python
+def construct_logical_operators(self,
+                                method: str = "boundary: 2") -> (Any, Any)
+```
+
+```
+    Constructs logical operators of the code.
+    
+    Parameters
+    ----------
+    method : str, optional
+        With boundaries with color 0, 1, 2. The options are:
+            "boundary: green"
+            "boundary: red"
+            "boundary: blue" (default)
+            "gottesman" (generic method)
+    
+    Returns
+    -------
+    logical_xs: numpy.array
+        Array of logical xs. Each row is an operator.
+    logical_zs: numpy.array
+        Array of logical xs. Each row is an operator.
+```
+
 <a id="stac.operation.Operation"></a>
 
 ## Operation
@@ -1062,78 +1204,6 @@ def rebase_qubits(self, new_base: tuple) -> 'Operation'
         A new Operation with new base address.
 ```
 
-<a id="stac.colorcode.hexagon_coordinates"></a>
-
-#### hexagon\_coordinates
-
-```python
-def hexagon_coordinates(x0: float,
-                        y0: float,
-                        size: int = 25,
-                        included: str = 'full') -> list[tuple[float, float]]
-```
-
-```
-    Determine the coordinates of the vertices of a hexagon.
-    
-    The hexagon is oriented so there are horizontal sides on the top and
-    bottom.
-    
-    Parameters
-    ----------
-    x0 : float
-        Horizontal position of center.
-    y0 : float
-        Vertical position of center.
-    size : int, optional
-        The radius of a circuit touching the vertices of the hexagon. The
-        default is 25.
-    included : str, optional
-        Which vertices to include in the output. The options are full, top,
-        bottom, left and right. The default is 'full'.
-    
-    Returns
-    -------
-    list(tuple(float))
-        A list of (x,y) coordinates. Go clockwise from the right-most vertex.
-```
-
-<a id="stac.colorcode.create_hexagon_svg"></a>
-
-#### create\_hexagon\_svg
-
-```python
-def create_hexagon_svg(x0: float,
-                       y0: float,
-                       color: str,
-                       size: int = 25,
-                       included: str = 'full')
-```
-
-```
-    Create an svg.Polygon object of a hexagon.
-    
-    Parameters
-    ----------
-    x0 : float
-        Horizontal position of center.
-    y0 : float
-        Vertical position of center.
-    color : str
-        Options are r, g or b.
-    size : int, optional
-        The radius of a circuit touching the vertices of the hexagon. The
-        default is 25.
-    included : str, optional
-        Which vertices to include in the output. The options are full, top,
-        bottom, left and right. The default is 'full'.
-    
-    Returns
-    -------
-    pg : svg.Polygon
-        The svg.Polygon object of the hexagon.
-```
-
 <a id="stac.colorcode.ColorCode"></a>
 
 ## ColorCode
@@ -1143,7 +1213,7 @@ class ColorCode(Code)
 ```
 
 ```
-    Class for creating color codes.
+    Class for creating triangular color codes.
 ```
 
 <a id="stac.colorcode.ColorCode.__init__"></a>
@@ -1151,7 +1221,10 @@ class ColorCode(Code)
 #### ColorCode.\_\_init\_\_
 
 ```python
-def __init__(self, distance: int, geometry: str = "hexagonal") -> None
+def __init__(self,
+             distance: int,
+             geometry: str = "hexagonal",
+             color_order: list[str] = ['g', 'r', 'b']) -> None
 ```
 
 ```
@@ -1164,6 +1237,37 @@ def __init__(self, distance: int, geometry: str = "hexagonal") -> None
     geometry : str, optional
         Describes the shape of the primal lattice. The default and only
         option currently is "hexagonal".
+    color_order: str, optional
+        Order of colors in the lattice.
+```
+
+<a id="stac.colorcode.ColorCode.construct_logical_operators"></a>
+
+#### ColorCode.construct\_logical\_operators
+
+```python
+def construct_logical_operators(self,
+                                method: str = "boundary: 2") -> (Any, Any)
+```
+
+```
+    Constructs logical operators of the code.
+    
+    Parameters
+    ----------
+    method : str, optional
+        With boundaries with color 0, 1, 2. The options are:
+            "boundary: green"
+            "boundary: red"
+            "boundary: blue" (default)
+            "gottesman" (generic method)
+    
+    Returns
+    -------
+    logical_xs: numpy.array
+        Array of logical xs. Each row is an operator.
+    logical_zs: numpy.array
+        Array of logical xs. Each row is an operator.
 ```
 
 <a id="stac.instruction.Instruction"></a>
