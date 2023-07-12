@@ -56,7 +56,7 @@ class ConcatCode(Code):
             # code2 = self.concat_sequence[1]
 
             # construct the concat generator matrix
-            if code1.num_physical_qubits % code2.num_logical_qubits == 0:
+            if code1.num_data_qubits % code2.num_logical_qubits == 0:
                 concat_generator_matrix = \
                     self._construct_generator_matrix_concat_k2_divides_n1(
                         code1, code2)
@@ -91,10 +91,10 @@ class ConcatCode(Code):
             The generator matrix of the concatenated code.
 
         """
-        n1 = code1.num_physical_qubits
+        n1 = code1.num_data_qubits
         k1 = code1.num_logical_qubits
         m1 = code1.num_generators
-        n2 = code2.num_physical_qubits
+        n2 = code2.num_data_qubits
         k2 = code2.num_logical_qubits
         m2 = code2.num_generators
         # physical qubits of concatenated code
@@ -179,10 +179,10 @@ class ConcatCode(Code):
             The generator matrix of the concatenated code.
 
         """
-        n1 = code1.num_physical_qubits
+        n1 = code1.num_data_qubits
         k1 = code1.num_logical_qubits
         m1 = code1.num_generators
-        n2 = code2.num_physical_qubits
+        n2 = code2.num_data_qubits
         k2 = code2.num_logical_qubits
         m2 = code2.num_generators
 

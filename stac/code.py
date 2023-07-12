@@ -266,12 +266,12 @@ class Code:
         if len(args) == 1:
             self.generator_matrix = args[0]
 
-            self.num_physical_qubits = int(self.generator_matrix.shape[1]/2)
+            self.num_data_qubits = int(self.generator_matrix.shape[1]/2)
 
             self.generators_x = \
-                self.generator_matrix[:, :self.num_physical_qubits]
+                self.generator_matrix[:, :self.num_data_qubits]
             self.generators_z = \
-                self.generator_matrix[:, self.num_physical_qubits:]
+                self.generator_matrix[:, self.num_data_qubits:]
 
         elif len(args) == 2:
             if args[0].shape != args[1].shape:
@@ -284,11 +284,11 @@ class Code:
             self.generator_matrix = np.concatenate(
                 (self.generators_x, self.generators_z), axis=1)
 
-            self.num_physical_qubits = self.generators_x.shape[1]
+            self.num_data_qubits = self.generators_x.shape[1]
 
         self.num_generators = self.generators_x.shape[0]
 
-        self.num_logical_qubits = self.num_physical_qubits \
+        self.num_logical_qubits = self.num_data_qubits \
             - self.num_generators
 
         self.distance: Optional[int] = None
@@ -317,7 +317,7 @@ class Code:
 
     def __str__(self) -> str:
         """Return a string representation of the object."""
-        return 'A [[{},{}]] code'.format(self.num_physical_qubits,
+        return 'A [[{},{}]] code'.format(self.num_data_qubits,
                                          self.num_logical_qubits)
 
     def check_valid_code(self) -> bool:
@@ -430,12 +430,12 @@ class Code:
         logical_zs: numpy.array
             Array of logical xs. Each row is an operator.
         """
-        if method == "gottesman":
+        if method != "gottesman":
             raise Exception("Only method=gottesman is supported.")
         if self.standard_generators_x is None:
             self.construct_standard_form()
 
-        n = self.num_physical_qubits
+        n = self.num_data_qubits
         k = self.num_logical_qubits
         r = self.rankx
 
@@ -508,7 +508,7 @@ class Code:
         if self.logical_xs is None:
             self.construct_logical_operators()
 
-        n = self.num_physical_qubits
+        n = self.num_data_qubits
 
         for name, operators in [('X', self.logical_xs),
                                 ('Z', self.logical_zs)]:
@@ -551,7 +551,7 @@ class Code:
             circ.append_register(
                 self.construct_encoded_qubit_register(
                     0, syndrome_measurement_type))
-            for i in range(self.num_physical_qubits):
+            for i in range(self.num_data_qubits):
                 circ.append(name, (0, 0, 0, i))
             self.logical_circuits[name] = circ
 
@@ -585,7 +585,7 @@ class Code:
         if self.standard_generators_x is None:
             self.construct_standard_form()
 
-        n = self.num_physical_qubits
+        n = self.num_data_qubits
 
         destabs = np.empty((self.num_generators, 2*n), dtype=int)
         destab_found = [False for i in range(self.num_generators)]
@@ -641,7 +641,7 @@ class Code:
             The data qubit register.
 
         """
-        return QubitRegister('d', level, self.num_physical_qubits)
+        return QubitRegister('d', level, self.num_data_qubits)
 
     def construct_syndrome_measurement_register(
             self,
@@ -713,7 +713,7 @@ class Code:
             Register for encoded qubit.
 
         """
-        n = self.num_physical_qubits
+        n = self.num_data_qubits
         datareg = QubitRegister('d', level, n)
         if syndrome_measurement_type == 'non_ft':
             genregs = [QubitRegister('g', level, 1)
@@ -763,7 +763,7 @@ class Code:
         if self.logical_xs is None:
             self.construct_logical_operators()
 
-        n = self.num_physical_qubits
+        n = self.num_data_qubits
         k = self.num_logical_qubits
         r = self.rankx
 
@@ -813,7 +813,7 @@ class Code:
         if self.logical_xs is None:
             self.construct_logical_operators()
 
-        n = self.num_physical_qubits
+        n = self.num_data_qubits
         k = self.num_logical_qubits
 
         self.decoding_circuit = Circuit()
@@ -921,7 +921,7 @@ class Code:
             syndrome_circuit.append("H", (0, 0, 1, i, 0))
 
         for i in range(self.num_generators):
-            for j in range(self.num_physical_qubits):
+            for j in range(self.num_data_qubits):
                 if generators_x[i, j] and generators_z[i, j]:
                     syndrome_circuit.append("CX",
                                             (0, 0, 1, i, 0),
@@ -989,7 +989,7 @@ class Code:
         # measure each generator
         for i in range(self.num_generators):
             k = 0
-            for j in range(self.num_physical_qubits):
+            for j in range(self.num_data_qubits):
                 if generators_x[i, j] and generators_z[i, j]:
                     syndrome_circuit.append("CX",
                                             (0, 0, 1, i, 0, k),
@@ -1084,7 +1084,7 @@ class Code:
                     sreg = RegisterRegister(
                         's',
                         j,
-                        QubitRegister('g', j, self.num_physical_qubits))
+                        QubitRegister('g', j, self.num_data_qubits))
                     sreg.code = self
                     address = circ.append_register(sreg)
                     qubit.constituent_register = address
