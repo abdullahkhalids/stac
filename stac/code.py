@@ -4,6 +4,8 @@ from typing import Any, Optional
 from itertools import combinations
 from IPython.display import display, Math
 import numpy as np
+from random import randint
+
 
 # from .operation import Operation
 # from .timepoint import Timepoint
@@ -488,7 +490,7 @@ class Code:
             d = np.binary_repr(i, m)
             sel = np.array(list(d), dtype=int).astype(bool)
             op = (np.sum(self.generator_matrix[sel, :], axis=0) + operator) % 2
-            yield op	
+            yield op
 
     def construct_logical_gate_circuits(
             self,
@@ -1103,3 +1105,64 @@ class Code:
                         circ.append(op.rebase_qubits((reg.level, reg.index)))
                     circ.cur_time += 1
         return circ
+
+    def generate_error(self,
+                       error_type: str = 'X',
+                       weight: int = 1
+                       ) -> (np.ndarray, set):
+        """
+        Create a pure X or pure Z error as a binary vector of length 2n.
+
+        Parameters
+        ----------
+        error_type : str, optional
+            Either 'X' or 'Z'. The default is 'X'.
+        weight : int, optional
+            The weight of the error. The default is 1.
+
+        Returns
+        -------
+        error: np.ndarray
+            The error.
+        """
+        error = np.zeros(2*self.num_data_qubits, dtype=int)
+        error_locations = set()
+        if error_type == 'X':
+            while len(error_locations) < weight:
+                error_locations.add(randint(0, self.num_data_qubits-1))
+
+            for loc in error_locations:
+                error[loc] = 1
+        elif error_type == 'Z':
+            while len(error_locations) < weight:
+                error_locations.add(randint(self.num_data_qubits,
+                                            2*self.num_data_qubits-1))
+            for loc in error_locations:
+                error[self.num_data_qubits + loc] = 1
+
+        return error
+
+    def compute_syndrome(self,
+                         error: np.ndarray
+                         ) -> np.ndarray:
+        """
+        Compute the syndrome of an error.
+
+        Parameters
+        ----------
+        error : np.ndarray
+            A binary vector of length 2n.
+
+        Returns
+        -------
+        syndrome : TYPE
+            A binary vector of length m.
+
+        """
+        swapped_vector = np.append(
+            error[self.num_data_qubits: 2*self.num_data_qubits],
+            error[0: self.num_data_qubits]
+            )
+        syndrome = self.generator_matrix @ swapped_vector % 2
+
+        return syndrome
