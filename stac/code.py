@@ -314,13 +314,17 @@ class Code:
 
     def __repr__(self) -> str:
         """Return a representation of the object."""
-        pass
         return f'Code(\n{self.generator_matrix}\n)'
 
     def __str__(self) -> str:
         """Return a string representation of the object."""
-        return 'A [[{},{}]] code'.format(self.num_data_qubits,
-                                         self.num_logical_qubits)
+        if self.distance:
+            return 'A [[{}, {}, {}]] code'.format(self.num_data_qubits,
+                                                  self.num_logical_qubits,
+                                                  self.	distance)
+        else:
+            return 'A [[{}, {}]] code'.format(self.num_data_qubits,
+                                              self.num_logical_qubits)
 
     def check_valid_code(self) -> bool:
         """
@@ -1162,7 +1166,7 @@ class Code:
         swapped_vector = np.append(
             error[self.num_data_qubits: 2*self.num_data_qubits],
             error[0: self.num_data_qubits]
-            )
+        )
         syndrome = self.generator_matrix @ swapped_vector % 2
 
         return syndrome
