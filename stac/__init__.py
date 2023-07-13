@@ -9,3 +9,5 @@ from .code import *
 from .commoncodes import CommonCodes
 from .concatenation import *
 from .instructionblock import InstructionBlock
+from .topologicalcodes.colorcode import ColorCode
+
