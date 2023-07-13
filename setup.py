@@ -22,5 +22,8 @@ setup(
                       "qiskit",
                       "stim",
                       "tabulate",
-                      "svg.py"]
+                      "svg.py",
+                      "bidict",
+                      "networkx",
+                      "matplotlib"]
 )
