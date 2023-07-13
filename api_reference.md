@@ -51,18 +51,6 @@
   * [\_\_hash\_\_](#stac.operation.Operation.__hash__)
   * [copy](#stac.operation.Operation.copy)
   * [rebase\_qubits](#stac.operation.Operation.rebase_qubits)
-* [PrimalLattice](#stac.primallattice.PrimalLattice)
-  * [setup\_draw](#stac.primallattice.PrimalLattice.setup_draw)
-  * [label\_vertex](#stac.primallattice.PrimalLattice.label_vertex)
-  * [label\_operator](#stac.primallattice.PrimalLattice.label_operator)
-  * [label\_face](#stac.primallattice.PrimalLattice.label_face)
-  * [label\_syndrome](#stac.primallattice.PrimalLattice.label_syndrome)
-  * [draw](#stac.primallattice.PrimalLattice.draw)
-* [ColorCode](#stac.colorcode.ColorCode)
-  * [\_\_init\_\_](#stac.colorcode.ColorCode.__init__)
-  * [construct\_logical\_operators](#stac.colorcode.ColorCode.construct_logical_operators)
-  * [construct\_dual\_graph](#stac.colorcode.ColorCode.construct_dual_graph)
-  * [construct\_restricted\_graphs](#stac.colorcode.ColorCode.construct_restricted_graphs)
 * [Instruction](#stac.instruction.Instruction)
 * [Register](#stac.register.Register)
   * [\_\_init\_\_](#stac.register.Register.__init__)
@@ -114,6 +102,18 @@
   * [construct\_encoded\_qubit](#stac.code.Code.construct_encoded_qubit)
   * [generate\_error](#stac.code.Code.generate_error)
   * [compute\_syndrome](#stac.code.Code.compute_syndrome)
+* [PrimalLattice](#stac.topologicalcodes.primallattice.PrimalLattice)
+  * [setup\_draw](#stac.topologicalcodes.primallattice.PrimalLattice.setup_draw)
+  * [label\_vertex](#stac.topologicalcodes.primallattice.PrimalLattice.label_vertex)
+  * [label\_operator](#stac.topologicalcodes.primallattice.PrimalLattice.label_operator)
+  * [label\_face](#stac.topologicalcodes.primallattice.PrimalLattice.label_face)
+  * [label\_syndrome](#stac.topologicalcodes.primallattice.PrimalLattice.label_syndrome)
+  * [draw](#stac.topologicalcodes.primallattice.PrimalLattice.draw)
+* [ColorCode](#stac.topologicalcodes.colorcode.ColorCode)
+  * [\_\_init\_\_](#stac.topologicalcodes.colorcode.ColorCode.__init__)
+  * [construct\_logical\_operators](#stac.topologicalcodes.colorcode.ColorCode.construct_logical_operators)
+  * [construct\_dual\_graph](#stac.topologicalcodes.colorcode.ColorCode.construct_dual_graph)
+  * [construct\_restricted\_graphs](#stac.topologicalcodes.colorcode.ColorCode.construct_restricted_graphs)
 * [InstructionBlock](#stac.instructionblock.InstructionBlock)
   * [\_\_repr\_\_](#stac.instructionblock.InstructionBlock.__repr__)
   * [\_\_str\_\_](#stac.instructionblock.InstructionBlock.__str__)
@@ -1070,232 +1070,6 @@ def rebase_qubits(self, new_base: tuple) -> 'Operation'
     -------
     Operation
         A new Operation with new base address.
-```
-
-<a id="stac.primallattice.PrimalLattice"></a>
-
-## PrimalLattice
-
-```python
-class PrimalLattice()
-```
-
-```
-    Primal lattice for color codes.
-```
-
-<a id="stac.primallattice.PrimalLattice.setup_draw"></a>
-
-#### PrimalLattice.setup\_draw
-
-```python
-def setup_draw(self,
-               draw_boundaries: bool = False,
-               draw_vertex_labels: Optional[int] = None,
-               draw_face_labels: Optional[int] = None) -> None
-```
-
-```
-    Set the options for drawing the primal lattice.
-    
-    The `draw` function can be used to display the lattice.
-    
-    Parameters
-    ----------
-    draw_boundaries : bool, optional
-        Draw the boundaries of the lattice. The default is False.
-    draw_vertex_labels : Optional[int], optional
-        Draw the vertex labels. The default is None.
-    draw_face_labels : Optional[int], optional
-        Draw the face labels. The default is None.
-```
-
-<a id="stac.primallattice.PrimalLattice.label_vertex"></a>
-
-#### PrimalLattice.label\_vertex
-
-```python
-def label_vertex(self, label: str, node: tuple) -> None
-```
-
-```
-    Label a vertex on the lattice to be drawn.
-    
-    Parameters
-    ----------
-    label : str
-        Label to include. One character for nice display.
-    node : tuple
-        The address of the node at which to place the label..
-```
-
-<a id="stac.primallattice.PrimalLattice.label_operator"></a>
-
-#### PrimalLattice.label\_operator
-
-```python
-def label_operator(self, operator: np.ndarray) -> None
-```
-
-```
-    Label an operator on the lattice to be drawn.
-    
-    Parameters
-    ----------
-    operator : np.ndarray
-        A one-dimensional numpy array of the operator. with length twice
-        the number of qubits in the code. Entries should be 0 or 1.
-```
-
-<a id="stac.primallattice.PrimalLattice.label_face"></a>
-
-#### PrimalLattice.label\_face
-
-```python
-def label_face(self, label: str, face: tuple) -> None
-```
-
-```
-    Label a face on the lattice to be drawn.
-    
-    Parameters
-    ----------
-    label : str
-        The string to be placed on the face.
-    face : tuple
-        The address of the face which is to be labelled.
-```
-
-<a id="stac.primallattice.PrimalLattice.label_syndrome"></a>
-
-#### PrimalLattice.label\_syndrome
-
-```python
-def label_syndrome(self, syndrome: np.ndarray) -> None
-```
-
-```
-    Label a syndrome on the lattice to be drawn.
-    
-    Parameters
-    ----------
-    syndrome : np.ndarray
-        A one-dimensional numpy array. Length should be equal to the number
-        of generators of the code. Entries should be 0 or 1.
-```
-
-<a id="stac.primallattice.PrimalLattice.draw"></a>
-
-#### PrimalLattice.draw
-
-```python
-def draw(self) -> None
-```
-
-```
-    Display the primal lattice with any labels put on it.
-```
-
-<a id="stac.colorcode.ColorCode"></a>
-
-## ColorCode
-
-```python
-class ColorCode(Code)
-```
-
-```
-    Class for creating triangular color codes.
-```
-
-<a id="stac.colorcode.ColorCode.__init__"></a>
-
-#### ColorCode.\_\_init\_\_
-
-```python
-def __init__(self,
-             distance: int,
-             geometry: str = "hexagonal",
-             color_order: list[str] = ['g', 'r', 'b']) -> None
-```
-
-```
-    Construct the color code of some geometry and distance.
-    
-    Parameters
-    ----------
-    distance : int
-        The distance of the code.
-    geometry : str, optional
-        Describes the shape of the primal lattice. The default and only
-        option currently is "hexagonal".
-    color_order: str, optional
-        Order of colors in the lattice.
-```
-
-<a id="stac.colorcode.ColorCode.construct_logical_operators"></a>
-
-#### ColorCode.construct\_logical\_operators
-
-```python
-def construct_logical_operators(self,
-                                method: str = "boundary: blue") -> (Any, Any)
-```
-
-```
-    Construct logical operators of the code.
-    
-    Parameters
-    ----------
-    method : str, optional
-        With boundaries with color 0, 1, 2. The options are:
-            "boundary: green"
-            "boundary: red"
-            "boundary: blue" (default)
-            "gottesman" (generic method)
-    
-    Returns
-    -------
-    logical_xs: numpy.array
-        Array of logical xs. Each row is an operator.
-    logical_zs: numpy.array
-        Array of logical xs. Each row is an operator.
-```
-
-<a id="stac.colorcode.ColorCode.construct_dual_graph"></a>
-
-#### ColorCode.construct\_dual\_graph
-
-```python
-def construct_dual_graph(self)
-```
-
-```
-    Construct the dual graph of the code.
-    
-    In the dual graph, the stabilizers are mapped onto the vertices and
-    the qubits are mapped onto the faces. The stabilizers refer to either
-    the set of pure X stabilizers of the code, or the pure Z ones. The
-    vertices are colored, like the faces of the primal lattice.
-```
-
-<a id="stac.colorcode.ColorCode.construct_restricted_graphs"></a>
-
-#### ColorCode.construct\_restricted\_graphs
-
-```python
-def construct_restricted_graphs(self)
-```
-
-```
-    Construct the restricted graphs.
-    
-    There are three restricted graphs. Each is built by omitting vertices
-    of one color from the dual graph.
-    
-    The graphs are stored in the dictionary `self.restricted_graphs`. There
-    are three keys for this dictionary, (0, 1), (0, 2), and (1, 2),
-    referring to the colors that are included in the graph.
 ```
 
 <a id="stac.instruction.Instruction"></a>
@@ -2317,6 +2091,232 @@ def compute_syndrome(self, error: np.ndarray) -> np.ndarray
     -------
     syndrome : TYPE
         A binary vector of length m.
+```
+
+<a id="stac.topologicalcodes.primallattice.PrimalLattice"></a>
+
+## PrimalLattice
+
+```python
+class PrimalLattice()
+```
+
+```
+    Primal lattice for color codes.
+```
+
+<a id="stac.topologicalcodes.primallattice.PrimalLattice.setup_draw"></a>
+
+#### PrimalLattice.setup\_draw
+
+```python
+def setup_draw(self,
+               draw_boundaries: bool = False,
+               draw_vertex_labels: Optional[int] = None,
+               draw_face_labels: Optional[int] = None) -> None
+```
+
+```
+    Set the options for drawing the primal lattice.
+    
+    The `draw` function can be used to display the lattice.
+    
+    Parameters
+    ----------
+    draw_boundaries : bool, optional
+        Draw the boundaries of the lattice. The default is False.
+    draw_vertex_labels : Optional[int], optional
+        Draw the vertex labels. The default is None.
+    draw_face_labels : Optional[int], optional
+        Draw the face labels. The default is None.
+```
+
+<a id="stac.topologicalcodes.primallattice.PrimalLattice.label_vertex"></a>
+
+#### PrimalLattice.label\_vertex
+
+```python
+def label_vertex(self, label: str, node: tuple) -> None
+```
+
+```
+    Label a vertex on the lattice to be drawn.
+    
+    Parameters
+    ----------
+    label : str
+        Label to include. One character for nice display.
+    node : tuple
+        The address of the node at which to place the label..
+```
+
+<a id="stac.topologicalcodes.primallattice.PrimalLattice.label_operator"></a>
+
+#### PrimalLattice.label\_operator
+
+```python
+def label_operator(self, operator: np.ndarray) -> None
+```
+
+```
+    Label an operator on the lattice to be drawn.
+    
+    Parameters
+    ----------
+    operator : np.ndarray
+        A one-dimensional numpy array of the operator. with length twice
+        the number of qubits in the code. Entries should be 0 or 1.
+```
+
+<a id="stac.topologicalcodes.primallattice.PrimalLattice.label_face"></a>
+
+#### PrimalLattice.label\_face
+
+```python
+def label_face(self, label: str, face: tuple) -> None
+```
+
+```
+    Label a face on the lattice to be drawn.
+    
+    Parameters
+    ----------
+    label : str
+        The string to be placed on the face.
+    face : tuple
+        The address of the face which is to be labelled.
+```
+
+<a id="stac.topologicalcodes.primallattice.PrimalLattice.label_syndrome"></a>
+
+#### PrimalLattice.label\_syndrome
+
+```python
+def label_syndrome(self, syndrome: np.ndarray) -> None
+```
+
+```
+    Label a syndrome on the lattice to be drawn.
+    
+    Parameters
+    ----------
+    syndrome : np.ndarray
+        A one-dimensional numpy array. Length should be equal to the number
+        of generators of the code. Entries should be 0 or 1.
+```
+
+<a id="stac.topologicalcodes.primallattice.PrimalLattice.draw"></a>
+
+#### PrimalLattice.draw
+
+```python
+def draw(self) -> None
+```
+
+```
+    Display the primal lattice with any labels put on it.
+```
+
+<a id="stac.topologicalcodes.colorcode.ColorCode"></a>
+
+## ColorCode
+
+```python
+class ColorCode(Code)
+```
+
+```
+    Class for creating triangular color codes.
+```
+
+<a id="stac.topologicalcodes.colorcode.ColorCode.__init__"></a>
+
+#### ColorCode.\_\_init\_\_
+
+```python
+def __init__(self,
+             distance: int,
+             geometry: str = "hexagonal",
+             color_order: list[str] = ['g', 'r', 'b']) -> None
+```
+
+```
+    Construct the color code of some geometry and distance.
+    
+    Parameters
+    ----------
+    distance : int
+        The distance of the code.
+    geometry : str, optional
+        Describes the shape of the primal lattice. The default and only
+        option currently is "hexagonal".
+    color_order: str, optional
+        Order of colors in the lattice.
+```
+
+<a id="stac.topologicalcodes.colorcode.ColorCode.construct_logical_operators"></a>
+
+#### ColorCode.construct\_logical\_operators
+
+```python
+def construct_logical_operators(self,
+                                method: str = "boundary: blue") -> (Any, Any)
+```
+
+```
+    Construct logical operators of the code.
+    
+    Parameters
+    ----------
+    method : str, optional
+        With boundaries with color 0, 1, 2. The options are:
+            "boundary: green"
+            "boundary: red"
+            "boundary: blue" (default)
+            "gottesman" (generic method)
+    
+    Returns
+    -------
+    logical_xs: numpy.array
+        Array of logical xs. Each row is an operator.
+    logical_zs: numpy.array
+        Array of logical xs. Each row is an operator.
+```
+
+<a id="stac.topologicalcodes.colorcode.ColorCode.construct_dual_graph"></a>
+
+#### ColorCode.construct\_dual\_graph
+
+```python
+def construct_dual_graph(self)
+```
+
+```
+    Construct the dual graph of the code.
+    
+    In the dual graph, the stabilizers are mapped onto the vertices and
+    the qubits are mapped onto the faces. The stabilizers refer to either
+    the set of pure X stabilizers of the code, or the pure Z ones. The
+    vertices are colored, like the faces of the primal lattice.
+```
+
+<a id="stac.topologicalcodes.colorcode.ColorCode.construct_restricted_graphs"></a>
+
+#### ColorCode.construct\_restricted\_graphs
+
+```python
+def construct_restricted_graphs(self)
+```
+
+```
+    Construct the restricted graphs.
+    
+    There are three restricted graphs. Each is built by omitting vertices
+    of one color from the dual graph.
+    
+    The graphs are stored in the dictionary `self.restricted_graphs`. There
+    are three keys for this dictionary, (0, 1), (0, 2), and (1, 2),
+    referring to the colors that are included in the graph.
 ```
 
 <a id="stac.instructionblock.InstructionBlock"></a>
