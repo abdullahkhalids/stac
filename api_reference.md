@@ -2295,8 +2295,8 @@ def construct_dual_graph(self)
     Construct the dual graph of the code.
     
     In the dual graph, the stabilizers are mapped onto the vertices and
-    the qubits are mapped onto the faces. The stabilizers refer to either
-    the set of pure X stabilizers of the code, or the pure Z ones. The
+    the qubits are mapped onto the faces. The stabilizers refer to both
+    the set of pure X stabilizers of the code, and the pure Z ones. The
     vertices are colored, like the faces of the primal lattice.
 ```
 
