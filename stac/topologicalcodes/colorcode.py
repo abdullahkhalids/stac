@@ -259,8 +259,8 @@ class ColorCode(Code):
         Construct the dual graph of the code.
 
         In the dual graph, the stabilizers are mapped onto the vertices and
-        the qubits are mapped onto the faces. The stabilizers refer to either
-        the set of pure X stabilizers of the code, or the pure Z ones. The
+        the qubits are mapped onto the faces. The stabilizers refer to both
+        the set of pure X stabilizers of the code, and the pure Z ones. The
         vertices are colored, like the faces of the primal lattice.
         """
         self.dual_graph = nx.Graph()
@@ -270,7 +270,8 @@ class ColorCode(Code):
                    self.primal_lattice.y_shift - val['pos_lat'][1])
             self.dual_graph.add_node(face,
                                      color=val['color'],
-                                     pos_graph=pos)
+                                     pos_graph=pos,
+                                     faces=val['nodes'])
 
         # now add edges between the new nodes
         for face in self.primal_graph.faces:
