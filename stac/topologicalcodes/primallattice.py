@@ -14,7 +14,7 @@ class PrimalLattice:
                  color_order):
         self.color_order = color_order
         self.primal_graph = primal_graph
-        self.params = dict()
+
         # lattice length
         self.lattice_length = int((distance-1)/2)
 

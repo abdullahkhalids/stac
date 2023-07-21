@@ -1,5 +1,5 @@
 """Module to provide color code."""
-from typing import Any
+from typing import Any, Optional
 from functools import partial
 import numpy as np
 import networkx as nx
@@ -169,6 +169,8 @@ class ColorCode(Code):
         generator_matrix[mhalf:, n:] = H
 
         super().__init__(generator_matrix)
+        self.num_generators_x = mhalf
+        self.num_generators_z = mhalf
         self.distance = distance
 
     def construct_logical_operators(self,
@@ -306,7 +308,10 @@ class ColorCode(Code):
 
     def _dual_graph_draw(self,
                          draw_vertex_labels: bool = True,
-                         draw_face_labels: bool = True):
+                         draw_face_labels: bool = True,
+                         edge_list: Optional[list] = None,
+                         highlight_nodes: Optional[list] = None
+                         ) -> None:
         """
         Draw the dual graph.
 
@@ -316,14 +321,34 @@ class ColorCode(Code):
             Draw the vertex labels. The default is True.
         draw_face_labels : bool, optional
             Draw the face labels. The default is False.
+        edge_list: list, optional
+            List of edges to draw
+        highlight_nodes: list, optional
+            List of nodes to highlight
         """
+        plt.figure(figsize=(10, 8))
+        plt.axis('off')
+
+        pos = nx.get_node_attributes(self.dual_graph, 'pos_graph')
+        if highlight_nodes:
+            nx.draw_networkx_nodes(self.dual_graph,
+                                   pos=pos,
+                                   nodelist=highlight_nodes,
+                                   node_size=450,
+                                   node_shape='s',
+                                   node_color='orange')
+
+        if not edge_list:
+            edge_list = list(self.dual_graph.edges())
+
         nx.draw(self.dual_graph,
-                pos=nx.get_node_attributes(self.dual_graph, 'pos_graph'),
+                pos=pos,
                 node_color=self.dual_graph.node_colors,
                 node_size=450,
                 font_size=7,
                 labels=self.dual_graph._node_labels,
-                with_labels=True)
+                with_labels=True,
+                edgelist=edge_list)
 
         if draw_face_labels:
             plt.axis('off')
