@@ -4,6 +4,7 @@ from functools import partial
 import numpy as np
 import networkx as nx
 import bidict
+from ordered_set import OrderedSet
 import matplotlib.pyplot as plt
 
 from stac import Circuit
@@ -42,7 +43,7 @@ class ColorCode(Code):
         # primal graph
         self.primal_graph = nx.Graph()
         self.primal_graph.faces = dict()
-        self.primal_graph.boundaries = {0: set(), 1: set(), 2: set()}
+        self.primal_graph.boundaries = dict()
         self.primal_graph.draw = self._primal_graph_draw
 
         # determine nodes and edges of primal graph
@@ -54,7 +55,7 @@ class ColorCode(Code):
         for i in range(distance):
             for j in range(heights[i]):
                 self.primal_graph.add_node((i, j),
-                                           faces=set())
+                                           faces=OrderedSet())
                 self.primal_graph.nodes_index[(i, j)] = kk
                 kk += 1
                 row_nodes[j].append((i, j))
@@ -71,12 +72,13 @@ class ColorCode(Code):
 
         # boundaries
         self.primal_graph.boundaries[2] = \
-            set([(i, 0) for i in range(distance)])
+            OrderedSet([(i, 0) for i in range(distance)])
         self.primal_graph.boundaries[1] = \
-            set([row[0] for i, row in enumerate(row_nodes) if i % 3 in [0, 1]])
+            OrderedSet([row[0] for i, row in enumerate(row_nodes)
+                        if i % 3 in [0, 1]])
         self.primal_graph.boundaries[0] = \
-            set([row[-1] for i, row in enumerate(row_nodes)
-                 if i % 3 in [0, 2]])
+            OrderedSet([row[-1] for i, row in enumerate(row_nodes)
+                        if i % 3 in [0, 2]])
 
         # faces
         f_heights = [i+1 for i in range(2, 3*L, 3)] + \
@@ -98,13 +100,13 @@ class ColorCode(Code):
                 else:
                     self.primal_graph.faces[(i, j)]['form'] = 'full'
 
-                nodes = []
+                nodes = OrderedSet()
 
                 for di, dj in [(1, 1), (1, 0), (1, -1),
                                (0, -1), (0, 0), (0, 1)]:
                     if j+dj < 0 or j+dj >= heights[i+di]:
                         continue
-                    nodes.append((i+di, j+dj))
+                    nodes.add((i+di, j+dj))
 
                 self.primal_graph.faces[(i, j)]['nodes'] = nodes
                 for v in nodes:
@@ -140,7 +142,7 @@ class ColorCode(Code):
             if 'color' in self.primal_graph.edges[e]:
                 continue
             face = self.primal_graph.nodes[e[0]]['faces'].difference(
-                self.primal_graph.nodes[e[1]]['faces']).pop()
+                self.primal_graph.nodes[e[1]]['faces'])[0]
             self.primal_graph.edges[e]['color'] = \
                 self.primal_graph.faces[face]['color']
 
@@ -274,6 +276,7 @@ class ColorCode(Code):
                                      color=val['color'],
                                      pos_graph=pos,
                                      faces=val['nodes'])
+        self.dual_graph.nodes_index = self.primal_graph.faces_index
 
         # now add edges between the new nodes
         for face in self.primal_graph.faces:
@@ -298,6 +301,14 @@ class ColorCode(Code):
             self.dual_graph.faces[node]['pos_graph'] = \
                 self.primal_graph.nodes[node]['pos_graph']
             self.dual_graph._face_labels[node] = str(node)[1:-1]
+        self.dual_graph.faces_index = self.primal_graph.nodes_index
+
+        # edges index
+        self.dual_graph.edges_index = bidict.bidict()
+        kk = 0
+        for e in self.dual_graph.edges:
+            self.dual_graph.edges_index[frozenset(e)] = kk
+            kk += 1
 
         # nicer labels
         self.dual_graph._node_labels = dict()
@@ -377,10 +388,12 @@ class ColorCode(Code):
         for c1, c2 in [(0, 1), (0, 2), (1, 2)]:
             self.restricted_graphs[c1, c2] = nx.Graph()
 
+            # add nodes
             for node, val in self.dual_graph.nodes.items():
                 if val['color'] in [c1, c2]:
                     self.restricted_graphs[c1, c2].add_node(node, **val)
 
+            # add edges
             for node in self.dual_graph.nodes:
                 if self.dual_graph.nodes[node]['color'] != c1:
                     continue
@@ -388,8 +401,8 @@ class ColorCode(Code):
                     if self.dual_graph.nodes[e[1]]['color'] == c2:
                         self.restricted_graphs[c1, c2].add_edge(*e)
                         self.restricted_graphs[c1, c2].edges[e]['faces'] = \
-                            set(self.primal_graph.faces[e[0]]['nodes']) & \
-                            set(self.primal_graph.faces[e[1]]['nodes'])
+                            self.primal_graph.faces[e[0]]['nodes'] & \
+                            self.primal_graph.faces[e[1]]['nodes']
 
             self.restricted_graphs[c1, c2].node_colors = \
                 [self.primal_lattice.color_map[

@@ -25,5 +25,6 @@ setup(
                       "svg.py",
                       "bidict",
                       "networkx",
-                      "matplotlib"]
+                      "matplotlib",
+                      "ordered-set"]
 )
