@@ -594,16 +594,11 @@ def qasm(self) -> str
 #### Circuit.stim
 
 ```python
-def stim(self, clean: bool = False) -> str
+def stim(self) -> str
 ```
 
 ```
     Convert circuit to a string that can be imported by stim.
-    
-    Parameters
-    ----------
-    clean : bool
-        If True, then pass it through stim to compactify it.
     
     Returns
     -------
