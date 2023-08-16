@@ -30,6 +30,8 @@ class PrimalLattice:
         # vertical separation between centers of diagonally stacked hexagons
         self.ver_sep = self.hexagon_size*np.sqrt(3)/2
 
+        self.length_scale = np.linalg.norm((self.hor_sep, self.ver_sep))
+
         # shift grid to keep in svg frame
         self.x_shift = self.hexagon_size*2
         self.y_shift = 3*self.lattice_length*self.ver_sep + self.hexagon_size/2
