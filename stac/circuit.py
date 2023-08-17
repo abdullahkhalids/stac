@@ -898,9 +898,15 @@ class Circuit:
 
         return qasm_str
 
-    def stim(self) -> str:
+    def stim(self,
+             clean: bool = False) -> str:
         """
         Convert circuit to a string that can be imported by stim.
+
+        Parameters
+        ----------
+        clean : bool
+            If True, then pass it through stim to compactify it.
 
         Returns
         -------
@@ -914,21 +920,18 @@ class Circuit:
 
         indent = ''
         for tp in self.instructions:
-            # if tp.repeat_start:
-            #     indent = '    '
-            #     stim_str += f'REPEAT {tp.repeat_repetitions}' + ' {\n'
             for op in tp:
+                opname = _operations[op.name]['stim_str']
                 t0 = self.register[op.targets[0]].constituent_register.index
                 if op.num_affected_qubits == 1:
-                    stim_str += indent + f'{op.name} {t0}\n'
+                    stim_str += indent + f'{opname} {t0}\n'
                 else:
                     t1 = self.register[op.targets[1]].\
                                             constituent_register.index
-                    stim_str += indent + f'{op.name} {t0} {t1}\n'
-            # if tp.repeat_end:
-            #     indent = ''
-            #     stim_str += '}\n'
+                    stim_str += indent + f'{opname} {t0} {t1}\n'
 
+        if clean:
+            stim_str = str(stim.Circuit(stim_str))
         return stim_str
 
     def quirk(self) -> None:
@@ -1363,29 +1366,35 @@ class Circuit:
                     width=slice_x-start_time, height=wirey[-1]+y_shift,
                     class_=[highlight_class]))
 
+        fig_width = slice_x+bxs
+        fig_height = wirey[-1]+bh
+
         el = [svg.Style(
             text="""
-            svg {background-color:white;}
+            .backgroundrect {fill: white;}
             .labeltext { font-family: Bitstream Vera Sans Mono;
                         font-size: 12px; font-weight: 400; fill: black;}
             .qubitline { stroke: black; stroke-width: 2; }
             .gatetext { font-family: Latin Modern Math, Cambria Math;
-                       font-size: 20px; font-weight: 400; fill: black;}
+                        font-size: 20px; font-weight: 400; fill: black;}
             .gaterect { fill: white; stroke: black; stroke-width: 2 }
             .control1 { fill: black; stroke: black; stroke-width: 1 }
             .controlline { stroke: black; stroke-width: 2}
             .tickline { stroke: black; stroke-width: 0.75; stroke-dasharray: 6,3}
             .tp_highlight1 { fill: red; opacity: 0.2;}
-            .tp_highlight2 { fill: blue; opacity: 0.2;}
-                """)] + recs + \
+            .tp_highlight2 { fill: blue; opacity: 0.2;}""")] + \
+            [svg.Rect(x=0, y=0,
+                      width=fig_width, height=fig_height,
+                      class_=["backgroundrect"])] + \
+            recs + \
             [svg.Line(
                 x1=x0+0, x2=slice_x+bxs,
                 y1=y, y2=y,
                 class_=["qubitline"]) for y in wirey] + el
 
         s = svg.SVG(
-            width=slice_x+bxs,
-            height=wirey[-1]+bh,
+            width=fig_width,
+            viewBox=f"0 0 {fig_width} {fig_height}",
             elements=el,
         )
 
