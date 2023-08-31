@@ -102,6 +102,7 @@
   * [construct\_encoded\_qubit](#stac.code.Code.construct_encoded_qubit)
   * [generate\_error](#stac.code.Code.generate_error)
   * [compute\_syndrome](#stac.code.Code.compute_syndrome)
+  * [verify\_correction](#stac.code.Code.verify_correction)
 * [PrimalLattice](#stac.topologicalcodes.primallattice.PrimalLattice)
   * [setup\_draw](#stac.topologicalcodes.primallattice.PrimalLattice.setup_draw)
   * [label\_vertex](#stac.topologicalcodes.primallattice.PrimalLattice.label_vertex)
@@ -2084,13 +2085,42 @@ def compute_syndrome(self, error: np.ndarray) -> np.ndarray
     
     Parameters
     ----------
-    error : np.ndarray
+    error : numpy.ndarray
         A binary vector of length 2n.
     
     Returns
     -------
-    syndrome : TYPE
+    syndrome : numpy.ndarray
         A binary vector of length m.
+```
+
+<a id="stac.code.Code.verify_correction"></a>
+
+#### Code.verify\_correction
+
+```python
+def verify_correction(self,
+                      error: np.ndarray,
+                      correction: np.ndarray,
+                      print_result: bool = True) -> bool
+```
+
+```
+    Verify if a correction corrects the given error.
+    
+    Parameters
+    ----------
+    error : numpy.ndarray
+        A binary vector of length 2n.
+    correction : numpy.ndarray
+        A binary vector of length 2n.
+    print_result : bool, optional
+        Print why correction fails or if it is valid. The default is True.
+    
+    Returns
+    -------
+    bool
+        True if correction valid, else False.
 ```
 
 <a id="stac.topologicalcodes.primallattice.PrimalLattice"></a>
