@@ -1154,12 +1154,12 @@ class Code:
 
         Parameters
         ----------
-        error : np.ndarray
+        error : numpy.ndarray
             A binary vector of length 2n.
 
         Returns
         -------
-        syndrome : TYPE
+        syndrome : numpy.ndarray
             A binary vector of length m.
 
         """
@@ -1170,3 +1170,41 @@ class Code:
         syndrome = self.generator_matrix @ swapped_vector % 2
 
         return syndrome
+
+    def verify_correction(self,
+                          error: np.ndarray,
+                          correction: np.ndarray,
+                          print_result: bool = True
+                          ) -> bool:
+        """
+        Verify if a correction corrects the given error.
+
+        Parameters
+        ----------
+        error : numpy.ndarray
+            A binary vector of length 2n.
+        correction : numpy.ndarray
+            A binary vector of length 2n.
+        print_result : bool, optional
+            Print why correction fails or if it is valid. The default is True.
+
+        Returns
+        -------
+        bool
+            True if correction valid, else False.
+
+        """
+        corrected_error = (error + correction) % 2
+        corrected_syndrome = self.compute_syndrome(corrected_error)
+
+        if any(corrected_syndrome):
+            if print_result:
+                print("Corrected state is not in stabilizer.")
+            return False
+        elif _inner_product(self.logical_zs[0], corrected_error) == 1:
+            if print_result:
+                print("Corrected state is logically incorrect.")
+        else:
+            if print_result:
+                print("Correction is valid.")
+            return True
