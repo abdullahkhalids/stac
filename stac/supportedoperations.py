@@ -15,6 +15,7 @@ for name in ['I', 'X', 'Y', 'Z', 'H', 'S', 'T', 'CAT']:
         'ins_type': 0,
         'is_parameterized': False,
         'num_targets': 1,
+        'control_targets': set(),
         'draw_text': [name],
         'draw_img': [name],
         'stim_str': name,
@@ -30,6 +31,7 @@ for name in ['RX', 'RY', 'RZ']:
         'ins_type': 0,
         'is_parameterized': True,
         'num_targets': 1,
+        'control_targets': set(),
         'num_parameters': 1,
         'draw_text': [name],
         'draw_img': [name],
@@ -42,6 +44,7 @@ for name in ['CX', 'CY', 'CZ']:
         'ins_type': 0,
         'is_parameterized': False,
         'num_targets': 2,
+        'control_targets': {0},
         'draw_text': ['●', name[1]],
         'draw_img': ['●', name[1]],
         'stim_str': name,
@@ -55,6 +58,7 @@ for name in ['R', 'M', 'MR']:
         'ins_type': 0,
         'is_parameterized': False,
         'num_targets': 1,
+        'control_targets': set(),
         'draw_text': [name],
         'draw_img': [name],
         'stim_str': name,
@@ -71,7 +75,16 @@ for name in ['TICK']:
         'ins_type': 1,
         'is_parameterized': False,
         'num_targets': 0,
+        'control_targets': set(),
         'stim_str': name,
         'qasm_str': ''
         }
 _operations['TICK']['qasm_str'] = 'barrier q;\n'
+
+_operations['DETECTOR'] = {
+    'ins_type': 1,
+    'is_parameterized': False,
+    'num_targets': -1,
+    'control_targets': set(),
+    'stim_str': name,
+    }
