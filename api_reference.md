@@ -233,7 +233,6 @@ def simple(num_qubits: int) -> 'Circuit'
     0 H (0, 0, 0)
     1 CX (0, 0, 0) (0, 0, 1)
     
-    
     Parameters
     ----------
     num_qubits : int
