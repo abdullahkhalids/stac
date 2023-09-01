@@ -321,7 +321,8 @@ class ColorCode(Code):
                          draw_vertex_labels: bool = True,
                          draw_face_labels: bool = True,
                          edge_list: Optional[list] = None,
-                         highlight_nodes: Optional[list] = None
+                         highlight_nodes: Optional[list] = None,
+                         highlight_faces: Optional[list] = None
                          ) -> None:
         """
         Draw the dual graph.
@@ -335,7 +336,9 @@ class ColorCode(Code):
         edge_list: list, optional
             List of edges to draw
         highlight_nodes: list, optional
-            List of nodes to highlight
+            List of nodes to highlight.
+        highlight_faces: list, optional
+            List of faces to highlight.
         """
         plt.figure(figsize=(10, 8))
         plt.axis('off')
@@ -348,6 +351,19 @@ class ColorCode(Code):
                                    node_size=450,
                                    node_shape='s',
                                    node_color='orange')
+
+        if highlight_faces:
+            pos_faces = {f: val['pos_graph']
+                         for f, val in self.dual_graph.faces.items()
+                         if f in highlight_faces}
+            lbls = {f: ' '*len(self.dual_graph._face_labels[f])
+                    for f in highlight_faces}
+            nx.draw_networkx_labels(self.dual_graph,
+                                    pos=pos_faces,
+                                    labels=lbls,
+                                    bbox=dict(facecolor='cyan',
+                                              linewidth=0),
+                                    font_size=7)
 
         if not edge_list:
             edge_list = list(self.dual_graph.edges())
@@ -365,10 +381,10 @@ class ColorCode(Code):
             plt.axis('off')
             pos = {f: val['pos_graph']
                    for f, val in self.dual_graph.faces.items()}
-            nx.draw_networkx_nodes(self.primal_graph,
-                                   pos=pos,
-                                   node_color='white')
-            nx.draw_networkx_labels(self.primal_graph,
+            # nx.draw_networkx_nodes(self.dual_graph,
+            #                        pos=pos,
+            #                        node_color='white')
+            nx.draw_networkx_labels(self.dual_graph,
                                     pos=pos,
                                     labels=self.dual_graph._face_labels,
                                     font_size=7)
