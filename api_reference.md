@@ -154,6 +154,11 @@
   * [\_\_init\_\_](#stac.commoncodes.CommonCodes.__init__)
   * [generate\_code](#stac.commoncodes.CommonCodes.generate_code)
 
+```python
+>>> import stac
+
+```
+
 <a id="stac.circuit.display_states"></a>
 
 #### display\_states
@@ -220,6 +225,14 @@ def simple(num_qubits: int) -> 'Circuit'
     
     In this circuit there is one register, and user can add operations by
     reference to an integer qubit index. For example, `append('H', 5)`.
+    
+    >>> circ = stac.Circuit.simple(2)
+    >>> circ.append('H', 0)
+    >>> circ.append('CX', 0, 1)
+    >>> circ
+    0 H (0, 0, 0)
+    1 CX (0, 0, 0) (0, 0, 1)
+    
     
     Parameters
     ----------
