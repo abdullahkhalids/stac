@@ -48,6 +48,20 @@ while i < len(L):
 
 L.append('```')
 
+importstac = '''```python
+>>> import stac
+
+```
+
+'''
+
+for i, line in enumerate(L):
+    if line[0:2] != '<a':
+        continue
+    else:
+        L.insert(i, importstac)
+        break
+
 with open(filename, "w") as outfile:
     for line in L:
         outfile.write(line)
