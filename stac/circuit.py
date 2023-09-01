@@ -114,6 +114,13 @@ class Circuit:
         In this circuit there is one register, and user can add operations by
         reference to an integer qubit index. For example, `append('H', 5)`.
 
+        >>> circ = stac.Circuit.simple(2)
+        >>> circ.append('H', 0)
+        >>> circ.append('CX', 0, 1)
+        >>> circ
+        0 H (0, 0, 0)
+        1 CX (0, 0, 0) (0, 0, 1)
+
         Parameters
         ----------
         num_qubits : int
@@ -148,7 +155,7 @@ class Circuit:
                 st = textwrap.indent(str(anns), ' '*label_len) + '\n'
                 s += st
 
-        return s
+        return s[:-1]
 
     def __str__(self) -> str:
         """Return a string representation of the object."""
