@@ -226,13 +226,6 @@ def simple(num_qubits: int) -> 'Circuit'
     In this circuit there is one register, and user can add operations by
     reference to an integer qubit index. For example, `append('H', 5)`.
     
-    >>> circ = stac.Circuit.simple(2)
-    >>> circ.append('H', 0)
-    >>> circ.append('CX', 0, 1)
-    >>> circ
-    0 H (0, 0, 0)
-    1 CX (0, 0, 0) (0, 0, 1)
-    
     Parameters
     ----------
     num_qubits : int
@@ -242,6 +235,15 @@ def simple(num_qubits: int) -> 'Circuit'
     -------
     circ : Circuit
         An empty circuit.
+    
+    Examples
+    --------
+    >>> circ = stac.Circuit.simple(2)
+    >>> circ.append('H', 0)
+    >>> circ.append('CX', 0, 1)
+    >>> circ
+    0 H (0, 0, 0)
+    1 CX (0, 0, 0) (0, 0, 1)
 ```
 
 <a id="stac.circuit.Circuit.__repr__"></a>
@@ -999,6 +1001,20 @@ def __init__(self,
     This contructor does no checks on whether the name, controls or targets
     are valid. These checks should be done before appending the operation
     to the circuit.
+    
+    Examples
+    --------
+    >>> op = stac.Operation('H', [(0, 0, 3)])
+    >>> op
+    H (0, 0, 3)
+    
+    >>> op = stac.Operation('CX', [(0, 0, 3), (0, 0, 2)])
+    >>> op
+    CX (0, 0, 3) (0, 0, 2)
+    
+    >>> op = stac.Operation('RX', [(0, 0, 1)], [0.5])
+    >>> op
+    RX(0.5) (0, 0, 1)
 ```
 
 <a id="stac.operation.Operation.__repr__"></a>
@@ -1083,6 +1099,12 @@ def rebase_qubits(self, new_base: tuple) -> 'Operation'
     -------
     Operation
         A new Operation with new base address.
+    
+    Examples
+    --------
+    >>> op = stac.Operation('CX', [(0, 0, 3), (0, 0, 2)])
+    >>> op.rebase_qubits((0,1))
+    CX (0, 1, 3) (0, 1, 2)
 ```
 
 <a id="stac.instruction.Instruction"></a>
@@ -1745,16 +1767,18 @@ def check_valid_code(self) -> bool
 ```
     Check if code generators commute.
     
+    Returns
+    -------
+    bool
+        True if the code generators commute, false otherwise.
+    
+    Examples
+    --------
     >>> generator_matrix = np.array([[1, 1, 0, 0, 0, 0],
     ...                             [0, 1, 1, 0, 0, 0]])
     >>> cd = stac.Code(generator_matrix)
     >>> cd.check_valid_code()
     True
-    
-    Returns
-    -------
-    bool
-        True if the code generators commute, false otherwise.
 ```
 
 <a id="stac.code.Code.check_in_normalizer"></a>
