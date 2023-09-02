@@ -330,6 +330,12 @@ class Code:
         """
         Check if code generators commute.
 
+        >>> generator_matrix = np.array([[1, 1, 0, 0, 0, 0],
+        ...                             [0, 1, 1, 0, 0, 0]])
+        >>> cd = stac.Code(generator_matrix)
+        >>> cd.check_valid_code()
+        True
+
         Returns
         -------
         bool
