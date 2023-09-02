@@ -29,6 +29,20 @@ class Operation(Instruction):
         This contructor does no checks on whether the name, controls or targets
         are valid. These checks should be done before appending the operation
         to the circuit.
+
+        Examples
+        --------
+        >>> op = stac.Operation('H', [(0, 0, 3)])
+        >>> op
+        H (0, 0, 3)
+
+        >>> op = stac.Operation('CX', [(0, 0, 3), (0, 0, 2)])
+        >>> op
+        CX (0, 0, 3) (0, 0, 2)
+
+        >>> op = stac.Operation('RX', [(0, 0, 1)], [0.5])
+        >>> op
+        RX(0.5) (0, 0, 1)
         """
         # Todo Add classical controls
         # Any changes here should be reflected in copy()
@@ -114,6 +128,11 @@ class Operation(Instruction):
         Operation
             A new Operation with new base address.
 
+        Examples
+        --------
+        >>> op = stac.Operation('CX', [(0, 0, 3), (0, 0, 2)])
+        >>> op.rebase_qubits((0,1))
+        CX (0, 1, 3) (0, 1, 2)
         """
         L = len(new_base)
         new_targets = [new_base + q[L:] for q in self.targets]
