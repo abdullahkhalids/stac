@@ -12,7 +12,7 @@ from random import randint
 # from .qubit import PhysicalQubit, VirtualQubit
 from .register import QubitRegister, RegisterRegister
 from .circuit import Circuit
-from .supportedoperations import _operations
+from .supportedinstructions import instructions
 
 
 def print_matrix(array: Any,
@@ -306,7 +306,7 @@ class Code:
         self.logical_xs = None
         self.logical_zs = None
         self.logical_circuits: dict[str, Optional[Circuit]] = dict()
-        for op in _operations:
+        for op in instructions:
             self.logical_circuits[op] = None
 
         self.encoding_circuit = None
