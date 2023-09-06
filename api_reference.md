@@ -399,7 +399,9 @@ def append(self, *args, time=None)
     targets : int or tuple
         The addresses of any target qubits.
     time : int or [1] or None, optional
-        The time at which to append the operation. The default is None.
+        The time at which to append the operation. The default is None,
+        which uses self.cur_time as a guide. After every append operation
+        self.cur_time is set to when the instruction was added.
     params : float or list[float]
         If the gate is parameterized, this must be equal to the number of
         params passed.
