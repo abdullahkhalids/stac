@@ -1,5 +1,5 @@
 """
-The operations supported by stac.
+The instructions supported by stac.
 
 ins_type: int
     Instruction type. 0 for operation, 1 for annotation
@@ -8,28 +8,27 @@ num_targets: int
     instruction can take any number of targets.
 """
 
-_operations = dict()
+instructions = dict()
 
 for name in ['I', 'X', 'Y', 'Z', 'H', 'S', 'T', 'CAT']:
-    _operations[name] = {
+    instructions[name] = {
         'ins_type': 0,
-        'is_parameterized': False,
         'num_targets': 1,
         'control_targets': set(),
+        'num_parameters': 0,
         'draw_text': [name],
         'draw_img': [name],
         'stim_str': name,
         'qasm_str': name.lower() + ' q[{t0}];\n'
         }
-_operations['I']['qasm_str'] = 'id q[{t0}];\n'
-_operations['CAT']['stim_str'] = 'H'
-_operations['CAT']['draw_text'] = 'H'
-_operations['CAT']['draw_img'] = 'H'
+instructions['I']['qasm_str'] = 'id q[{t0}];\n'
+instructions['CAT']['stim_str'] = 'H'
+instructions['CAT']['draw_text'] = 'H'
+instructions['CAT']['draw_img'] = 'H'
 
 for name in ['RX', 'RY', 'RZ']:
-    _operations[name] = {
+    instructions[name] = {
         'ins_type': 0,
-        'is_parameterized': True,
         'num_targets': 1,
         'control_targets': set(),
         'num_parameters': 1,
@@ -40,51 +39,52 @@ for name in ['RX', 'RY', 'RZ']:
         }
 
 for name in ['CX', 'CY', 'CZ']:
-    _operations[name] = {
+    instructions[name] = {
         'ins_type': 0,
-        'is_parameterized': False,
         'num_targets': 2,
         'control_targets': {0},
+        'num_parameters': 0,
         'draw_text': ['●', name[1]],
         'draw_img': ['●', name[1]],
         'stim_str': name,
         'qasm_str': name.lower() + ' q[{t0}],q[{t1}];\n'
         }
-_operations['CX']['draw_text'][1] = '⊕'
-_operations['CZ']['draw_text'][1] = '●'
+instructions['CX']['draw_text'][1] = '⊕'
+instructions['CZ']['draw_text'][1] = '●'
 
 for name in ['R', 'M', 'MR']:
-    _operations[name] = {
+    instructions[name] = {
         'ins_type': 0,
-        'is_parameterized': False,
         'num_targets': 1,
         'control_targets': set(),
+        'num_parameters': 0,
         'draw_text': [name],
         'draw_img': [name],
         'stim_str': name,
         'qasm_str': ''
         }
-_operations['MR']['draw_text'][0] = 'm'
-_operations['R']['qasm_str'] = 'reset q[{t0}];\n'
-_operations['M']['qasm_str'] = 'measure q[{t0}] -> c[{t0}];\n'
-_operations['MR']['qasm_str'] = 'measure q[{t0}] -> c[{t0}];\n'
+instructions['MR']['draw_text'][0] = 'm'
+instructions['R']['qasm_str'] = 'reset q[{t0}];\n'
+instructions['M']['qasm_str'] = 'measure q[{t0}] -> c[{t0}];\n'
+instructions['MR']['qasm_str'] = 'measure q[{t0}] -> c[{t0}];\n'
 
-
-for name in ['TICK']:
-    _operations[name] = {
-        'ins_type': 1,
-        'is_parameterized': False,
-        'num_targets': 0,
-        'control_targets': set(),
-        'stim_str': name,
-        'qasm_str': ''
-        }
-_operations['TICK']['qasm_str'] = 'barrier q;\n'
-
-_operations['DETECTOR'] = {
+# annotations
+instructions['TICK'] = {
     'ins_type': 1,
-    'is_parameterized': False,
+    'num_targets': 0,
+    'control_targets': set(),
+    'num_parameters': 0,
+    'stim_str': name,
+    'qasm_str': 'barrier q;\n'
+    }
+
+instructions['DETECTOR'] = {
+    'ins_type': 1,
     'num_targets': -1,
     'control_targets': set(),
-    'stim_str': name,
+    'num_parameters': 0,
+    'draw_text': None,
+    'draw_img': None,
+    'stim_str': None,
+    'qasm_str': None
     }
