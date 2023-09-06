@@ -6,12 +6,14 @@ from .annotation import Annotation, AnnotationSlice
 from .timepoint import Timepoint
 from .qubit import PhysicalQubit  # , VirtualQubit
 from .register import Register, QubitRegister, RegisterRegister
-from .supportedoperations import _operations
+from .supportedinstructions import instructions
 from .instructionblock import InstructionBlock, AnnotationBlock
+from .measurementrecord import MeasurementRecord
 
 from IPython.display import display, SVG
 from itertools import chain
 import textwrap
+import numbers
 import sys
 import svg
 import json
@@ -278,7 +280,8 @@ class Circuit:
             self._cur_time = len(self.instructions) + new_time
 
     def _standardize_addresses(self,
-                               addresses: list[tuple]
+                               addresses: list[tuple],
+                               check_repeat: bool = True,
                                ) -> list[tuple]:
         """
         Standardize input addresses with respect to base_address.
@@ -289,6 +292,8 @@ class Circuit:
         ----------
         addresses : list[tuple]
             The addresses to standardize.
+        check_repeat: bool, True
+            If true checks that there are no repeated addresses.
 
         Raises
         ------
@@ -301,29 +306,50 @@ class Circuit:
             Standardized address or list of standardized addresses.
 
         """
-        standardized_addresses = []
-        if self.base_address:
+        if addresses == []:
+            level = 0
+        elif self.base_address:
             level = self.base_address[0]
         else:
-            level = addresses[0][0]
-        for input_address in addresses:
-            if type(input_address) is tuple:
-                full_address = self.base_address + input_address
-            elif type(input_address) is int:
-                full_address = self.base_address + tuple([input_address])
+            if type(addresses[0]) is tuple:
+                level = addresses[0][0]
             else:
-                raise Exception('Not a valid address')
+                # if a measurement record
+                level = addresses[0].address[0]
 
-            if full_address[0] != level:
-                raise Exception('Not all addresses are at the same level')
+        standardized_addresses = []
+        actual_addresses = []
+        for item in addresses:
+            if type(item) is tuple:
+                full_address = self.base_address + item
+                item_level = full_address[0]
+                self.register.check_address(full_address)
+                actual_addresses.append(full_address)
+            elif type(item) is int:
+                full_address = self.base_address + (item,)
+                item_level = full_address[0]
+                self.register.check_address(full_address)
+                actual_addresses.append(full_address)
+            elif type(item) is MeasurementRecord:
+                if type(item.address) is tuple:
+                    full_qubit_address = self.base_address + item.address
+                elif type(item.address) is int:
+                    full_qubit_address = self.base_address + (item.address,)
+                item_level = full_qubit_address[0]
+                self.register.check_address(full_qubit_address)
+                full_address = MeasurementRecord(full_qubit_address,
+                                                 item.index)
+                actual_addresses.append(full_qubit_address)
+            if item_level != level:
+                raise Exception('Not all addresses are at the same level.')
 
-            self.register.check_address(full_address)
             standardized_addresses.append(full_address)
 
-        if len(set(standardized_addresses)) != len(standardized_addresses):
+        if (check_repeat
+                and len(set(actual_addresses)) != len(actual_addresses)):
             raise Exception('Some addresses were repeated')
 
-        return standardized_addresses
+        return standardized_addresses, level
 
     def _apply_encoded_operation(self,
                                  op: Operation,
@@ -425,9 +451,14 @@ class Circuit:
         name : str
             Name of operation.
         targets : int or tuple
-            The addresses of any target qubits.
+            The addresses of any target qubits. For classical targets use the
+            notation [address, index] where address is a qubit address and
+            index is an int specifying the number of the measurement on that
+            qubit. May be negative.
         time : int or [1] or None, optional
-            The time at which to append the operation. The default is None.
+            The time at which to append the operation. The default is None,
+            which uses self.cur_time as a guide. After every append operation
+            self.cur_time is set to when the instruction was added.
         params : float or list[float]
             If the gate is parameterized, this must be equal to the number of
             params passed.
@@ -437,6 +468,12 @@ class Circuit:
         Exception
             If Operation not valid, or cannot be appened.
 
+        >>> circ = stac.Circuit.simple(5)
+        >>> circ.append('X', 2)
+        >>> circ.append('CX', [2, -1], 4)
+        >>> circ
+        0 X (0, 0, 2)
+          CX MR[(0, 0, 2), -1] (0, 0, 4)
         """
         # construct the operation if needed
         if len(args) == 1 and type(args[0]) is Operation:
@@ -447,46 +484,81 @@ class Circuit:
             ins_type = 1
         else:
             if type(args[0]) is not str:
-                raise Exception('Operation name must be str.')
+                raise Exception('Instruction name must be str.')
             name = args[0].upper()
 
-            # first do some type checking
-            op_info = _operations.get(name, False)
-            N = op_info["num_targets"]
+            # operation should be known
+            op_info = instructions.get(name, False)
             if not op_info:
-                raise Exception('Not a known operation.')
-            elif len(args) != N + 1 + op_info["is_parameterized"]:
-                s = f'{name} takes {N} targets.'
-                if op_info["is_parameterized"]:
-                    s += f' And a {op_info["num_parameters"]} parameter list.'
-                raise Exception(s)
-            elif any(not isinstance(t, (int, tuple)) for t in args[1:N+1]):
-                raise Exception('Target is not an int or tuple.')
-            elif op_info['is_parameterized']:
-                if (op_info['num_parameters'] == 1
-                        and type(args[-1]) is not float):
-                    raise Exception('parameter must be a float.')
-                elif op_info['num_parameters'] > 1:
-                    if (type(args[-1]) is not list
-                            or len(args[-1]) != op_info['num_parameters']):
-                        raise Exception(f'{name} needs \
-{op_info["num_parameters"]} parameters')
+                raise Exception('Not a known instruction.')
 
-            # now construct the operation
-            if op_info['is_parameterized']:
-                if op_info['num_parameters'] == 1:
-                    parameters = [args[N+1]]
+            # operation parameters
+            N = op_info["num_targets"]
+            M = op_info["num_parameters"]
+
+            # number of targets is correct and parameters provided.
+            if N >= 0 and len(args) != 1 + N + M:
+                s = f'{name} takes {N} targets.'
+                if M:
+                    s += f' And {M} parameter(s).'
+                raise Exception(s)
+
+            if N >= 0:
+                targets = list(args[1:N+1])
+            else:
+                targets = list(args[1:])
+            # type of targets is correct
+            # also turn measurement records into proper objects
+            # regular instructions
+            if N >= 0:
+                for i, target in enumerate(targets):
+                    if isinstance(target, (tuple, int)):
+                        pass
+                    elif (type(target) is list
+                          and len(target) == 2
+                          and isinstance(target[0], (tuple, int))
+                          and type(target[1]) == int
+                          and i in op_info['control_targets']):
+                        targets[i] = MeasurementRecord(target[0], target[1])
+                    else:
+                        raise Exception('A target is not correct.')
+                standardized_targets, level = \
+                    self._standardize_addresses(targets)
+            else:
+                # detectors
+                for i, target in enumerate(targets):
+                    if (type(target) is list
+                            and len(target) == 2
+                            and isinstance(target[0], (tuple, int))
+                            and type(target[1]) == int):
+                        targets[i] = MeasurementRecord(target[0], target[1])
+                    else:
+                        raise Exception('A target is not correct.')
+                standardized_targets, level = \
+                    self._standardize_addresses(targets, False)
+
+            # check number of parameters
+            if M:
+                parameters = args[-1]
+                if M == 1 and isinstance(parameters, numbers.Real):
+                    parameters = [parameters]
+                elif isinstance(parameters, list) and len(parameters) == M:
+                    pass
                 else:
-                    parameters = args[N+1]
+                    raise Exception(f'{name} takes {M} parameter(s).')
+
+                # check type of parameters is correct
+                if not all(isinstance(Pi, numbers.Real) for Pi in parameters):
+                    raise Exception('Every parameter must be a real number.')
             else:
                 parameters = None
 
+            # now construct the operation
             if op_info['ins_type'] == 0:
-                targets = self._standardize_addresses(list(args[1:N+1]))
-                op = Operation(name, targets, parameters=parameters)
+                op = Operation(name, standardized_targets, parameters)
                 ins_type = 0
             else:
-                ann = Annotation(name)
+                ann = Annotation(name, standardized_targets)
                 ins_type = 1
 
         # if needed add timepoints to circuit
@@ -496,36 +568,60 @@ class Circuit:
 
         # Insert annotation into the circuit
         if ins_type == 1:
+            # if circuit has no timepoints then add annotation to starting
+            # annotation slice.
             if len(self.instructions) == 0:
                 self.annotations[0].append(ann)
             else:
-                self.annotations[self.cur_time+1].append(ann)
+                # depending on user specified time, add timepoints to circuit.
+                if time is None:
+                    pass
+                elif time == [1]:
+                    self._append_tp()
+                    self.cur_time = len(self.instructions) - 1
+                elif type(time) is int:
+                    while time >= len(self.instructions):
+                        self._append_tp()
+                    self.cur_time = time
+
+                insert_ind = self.cur_time + 1
+                self.annotations[insert_ind].append(ann)
                 if ann.name == 'TICK':
                     self.cur_time += 1
             return
 
         # Insert instruction into the circuit
-        if op.targets[0][0] == 0:
+        if level == 0:
             if time is None:
+                # if the user has not specified a time, and the cur_time
+                # is within circuit bounds, then try to add operation to
+                # cur_time, else increment cur_time by 1 and try again.
                 while self.cur_time < len(self.instructions):
                     if self.instructions[self.cur_time].can_append(op):
                         self.instructions[self.cur_time].append(op)
                         break
                     else:
                         self.cur_time += 1
+                # if we reach end of circuit, then append a timepoint
+                # and add operation to it
                 else:
                     tp = Timepoint(op)
                     self._append_tp(tp)
+            # if the user wants to append operation to just ahead of the
+            # circuit, then do that.
             elif time == [1]:
                 tp = Timepoint(op)
                 self._append_tp(tp)
+                self.cur_time = len(self.instructions) - 1
+            # if user specifies arbitrary time, then follow that
             elif type(time) is int:
                 while time >= len(self.instructions):
-                    self._append_tp(Timepoint())
+                    self._append_tp()
                 if not self.instructions[time].can_append(op):
                     raise Exception('Cannot add operation to given timepoint.')
                 else:
                     self.instructions[time].append(op)
+                    self.cur_time = time
 
         else:
             self._apply_encoded_operation(op, time=time)
@@ -562,7 +658,7 @@ class Circuit:
         name = args[0].upper()
 
         # first do some type checking
-        op_info = _operations.get(name, False)
+        op_info = instructions.get(name, False)
         N = op_info["num_targets"]
         if not op_info:
             raise Exception('Not a known operation.')
@@ -883,21 +979,21 @@ class Circuit:
         qasm_str = ''
 
         for op in self:
-            if _operations[op.name]['num_targets'] == 0:
-                qasm_str += _operations[op.name]['qasm_str']
+            if instructions[op.name]['num_targets'] == 0:
+                qasm_str += instructions[op.name]['qasm_str']
                 continue
 
             t0 = self.register[op.targets[0]].constituent_register.index
             if op.num_affected_qubits == 1:
                 if op.is_parameterized:
-                    qasm_str += _operations[op.name]['qasm_str'].format(
+                    qasm_str += instructions[op.name]['qasm_str'].format(
                         p0=op.parameters[0], t0=t0)
                 else:
-                    qasm_str += _operations[op.name]['qasm_str'].format(t0=t0)
+                    qasm_str += instructions[op.name]['qasm_str'].format(t0=t0)
             else:
                 t1 = self.register[op.targets[1]].\
                         constituent_register.index
-                qasm_str += _operations[op.name]['qasm_str'].format(
+                qasm_str += instructions[op.name]['qasm_str'].format(
                                                                 t0=t0, t1=t1)
 
         qasm_str = 'OPENQASM 2.0;\ninclude "qelib1.inc";\n' \
@@ -925,19 +1021,38 @@ class Circuit:
         """
         if not self.layout_map:
             self.map_to_physical_layout()
+
+        measurement_records = dict()
+        for addr in self.register.qubit_addresses():
+            measurement_records[addr] = []
+
         stim_str = ''
 
         indent = ''
-        for tp in self.instructions:
+        c = 0
+        for tp, anns in zip(self.instructions, self.annotations[1:]):
             for op in tp:
-                opname = _operations[op.name]['stim_str']
+                op_stim_str = instructions[op.name]['stim_str']
                 t0 = self.register[op.targets[0]].constituent_register.index
                 if op.num_affected_qubits == 1:
-                    stim_str += indent + f'{opname} {t0}\n'
+                    stim_str += indent + f'{op_stim_str} {t0}\n'
                 else:
                     t1 = self.register[op.targets[1]].\
                                             constituent_register.index
-                    stim_str += indent + f'{opname} {t0} {t1}\n'
+                    stim_str += indent + f'{op_stim_str} {t0} {t1}\n'
+                if op.name in ['M', 'MR']:
+                    measurement_records[op.targets[0]].append(c)
+                    c += 1
+
+            for ann in anns:
+                if ann.name == 'TICK':
+                    stim_str += 'TICK\n'
+                elif ann.name == 'DETECTOR':
+                    op_stim_str = 'DETECTOR'
+                    for mr in ann.targets:
+                        rec_ind = measurement_records[mr.address][mr.index] - c
+                        op_stim_str += f' rec[{rec_ind}]'
+                    stim_str += indent + op_stim_str + '\n'
 
         if clean:
             stim_str = str(stim.Circuit(stim_str))
@@ -1163,7 +1278,7 @@ class Circuit:
                 for op in sl:
                     t0 = self.register[op.targets[0]].\
                         constituent_register.index
-                    draw_text = _operations[op.name]['draw_text']
+                    draw_text = instructions[op.name]['draw_text']
 
                     if op.num_affected_qubits == 1:
                         s = dash + draw_text[0] + dash
@@ -1308,7 +1423,7 @@ class Circuit:
                 for op in sl:
                     t0 = self.register[op.targets[0]].\
                         constituent_register.index
-                    draw_img = _operations[op.name]['draw_img']
+                    draw_img = instructions[op.name]['draw_img']
 
                     if op.num_affected_qubits == 1:
                         width = len(draw_img[0])*18+10
