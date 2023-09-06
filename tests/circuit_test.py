@@ -26,8 +26,7 @@ def test_append_basic():
 def test_append_next_timepoint():
     circ.append('H', (0, 0, 1))
     circ.append('X', (0, 0, 2), time=[1])
-    assert circ.__repr__(
-    ) == '0 H (0, 0, 0)\n  CX (0, 0, 1) (0, 1, 0, 0)\n1 H (0, 0, 1)\n2 X (0, 0, 2)'
+    assert circ.__repr__() == '0 H (0, 0, 0)\n  CX (0, 0, 1) (0, 1, 0, 0)\n1 H (0, 0, 1)\n2 X (0, 0, 2)'
 
 
 def test_append_past():
