@@ -397,7 +397,10 @@ def append(self, *args, time=None)
     name : str
         Name of operation.
     targets : int or tuple
-        The addresses of any target qubits.
+        The addresses of any target qubits. For classical targets use the
+        notation [address, index] where address is a qubit address and
+        index is an int specifying the number of the measurement on that
+        qubit. May be negative.
     time : int or [1] or None, optional
         The time at which to append the operation. The default is None,
         which uses self.cur_time as a guide. After every append operation
@@ -410,6 +413,13 @@ def append(self, *args, time=None)
     ------
     Exception
         If Operation not valid, or cannot be appened.
+    
+    >>> circ = stac.Circuit.simple(5)
+    >>> circ.append('X', 2)
+    >>> circ.append('CX', [2, -1], 4)
+    >>> circ
+    0 X (0, 0, 2)
+      CX MR[(0, 0, 2), -1] (0, 0, 4)
 ```
 
 <a id="stac.circuit.Circuit.geo_append"></a>
