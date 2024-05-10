@@ -199,7 +199,7 @@ def _perform_row_operations(A: Any,
         is a list of length three. The first entry is one of {colswap, rowswap
         addrow}. The next two arguments determine which rows to swap or add.
     start_row : int, optional
-        Shift the start row of the operations. The default is 0.
+        Shift the start row and column of the operations. The default is 0.
 
     Returns
     -------
@@ -211,7 +211,8 @@ def _perform_row_operations(A: Any,
 
     for op in ops:
         if op[0] == "colswap":
-            M[:, [op[1], op[2]]] = M[:, [op[2], op[1]]]
+            M[:,[start_row + op[1], start_row + op[2]]] = \
+                M[:,[start_row + op[2], start_row + op[1]]]
         elif op[0] == "rowswap":
             M[[start_row + op[1], start_row + op[2]], :] = \
                 M[[start_row + op[2], start_row + op[1]], :]
