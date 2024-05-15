@@ -20,11 +20,11 @@ you can
 * draw the circuits.
 * annotate the circuit with errors. This is useful for reasoning about how
   errors effect the circuits of quantum codes.
-* simulate circuits using either Qiskit or Stim.
+* simulate circuits using stim.
 * export to qasm, stim or quirk.
 
 One of the goals of stac (not there yet) is to compute the fault-tolerance
-thresholds of any stabilizer code in "one-click".
+thresholds of simple stabilizer codes in "one-click".
 
 ## Getting started
 To install stac, run

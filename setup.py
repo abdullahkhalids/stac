@@ -19,7 +19,6 @@ setup(
     include_package_data=True,
     install_requires=["ipython",
                       "numpy",
-                      "qiskit",
                       "stim",
                       "tabulate",
                       "svg.py",

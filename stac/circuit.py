@@ -18,7 +18,6 @@ import sys
 import svg
 import json
 import numpy as np
-from qiskit import QuantumCircuit, execute, Aer
 import stim
 import copy
 import bidict
@@ -479,6 +478,7 @@ class Circuit:
         if len(args) == 1 and type(args[0]) is Operation:
             op = args[0]
             ins_type = 0
+            level = list(op.affected_qubits)[0][0]
         elif len(args) == 1 and type(args[0]) is Annotation:
             ann = args[0]
             ins_type = 1
@@ -1098,7 +1098,9 @@ class Circuit:
                  print_state: bool = True
                  ) -> list[Any]:
         """
-        Simulate the circuit using qiskit.
+        Simulate the circuit.
+        
+        Uses stim's Tableau Simulator under the hood to do this.
 
         Parameters
         ----------
@@ -1131,13 +1133,11 @@ class Circuit:
             if ((op.name == 'TICK' and incremental)
                     or ind == len(self)-1):
                 cur_circ.append(op)
-                # cur_circ.append("I", n-1)
-                qc = QuantumCircuit.from_qasm_str(cur_circ.qasm())
-                job = execute(qc, Aer.get_backend('statevector_simulator'),
-                              shots=1,
-                              optimization_level=0)
-                sv = job.result().get_statevector()
-                amps = np.round(sv.data, 3)
+                circ = stim.Circuit(cur_circ.stim())
+                s = stim.TableauSimulator()
+                s.set_num_qubits(n)
+                s.do_circuit(circ)
+                amps = np.around(s.state_vector(endian='little'), 3)
                 for i in range(2**n):
                     tab[i].append(amps[i])
 
