@@ -668,7 +668,9 @@ def simulate(self,
 ```
 
 ```
-    Simulate the circuit using qiskit.
+    Simulate the circuit.
+    
+    Uses stim's Tableau Simulator under the hood to do this.
     
     Parameters
     ----------
